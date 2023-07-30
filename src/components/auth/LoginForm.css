@@ -1,0 +1,46 @@
+.login-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: #f8f9fa;
+  }
+  
+  .login-form h2 {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 24px;
+  }
+  
+  .login-form .form-group {
+    width: 100%;
+    margin-bottom: 16px;
+  }
+  
+  .login-form .form-group ion-input {
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 12px;
+  }
+  
+  .login-form .form-group ion-input::part(textarea) {
+    height: 40px;
+  }
+  
+  .login-form ion-button {
+    --background: #0063a6;
+    --background-activated: #00528e;
+    --background-hover: #004d84;
+    --color: #fff;
+    --border-radius: 8px;
+    --padding-top: 12px;
+    --padding-bottom: 12px;
+  }
+  
+  .login-form ion-button:disabled {
+    --background: #d3d3d3;
+    --background-activated: #d3d3d3;
+    --background-hover: #d3d3d3;
+  }
+  
