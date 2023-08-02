@@ -1,5 +1,4 @@
 from flask import request, jsonify
-from functools import wraps
 
 def verify_jwt_token(token):
     # Implement your logic here to verify the JWT token
