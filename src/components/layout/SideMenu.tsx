@@ -4,12 +4,12 @@ import {
   IonMenu, IonMenuToggle, IonTitle, IonToolbar, useIonAlert,
 } from '@ionic/react';
 import {
-  addCircleOutline, briefcaseOutline, cashOutline, checkmarkCircle, chatbubblesOutline, logOutOutline, notificationsOutline, personCircleOutline, sparklesOutline, walletOutline,
+  addCircleOutline, briefcaseOutline, shieldCheckmarkOutline, cashOutline, checkmarkCircle, chatbubblesOutline, logOutOutline, notificationsOutline, personCircleOutline, sparklesOutline, walletOutline,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
 import { PRODUCT_LABELS, ProductContext, productLandingRoute } from '../../utils/productContext';
-import { SMARTLOANS_PRODUCTS, isSmartLoansProduct } from '../../utils/smartLoansLanding';
+import { ENROLLABLE_PRODUCTS, isSmartLoansProduct } from '../../utils/smartLoansLanding';
 import { DEFAULT_AVATAR_URL } from '../../utils/formatters';
 import { fetchMyNotifications } from '../../api/myNotificationsApi';
 import { getChatConfig } from '../../api/loanChatApi';
@@ -17,7 +17,7 @@ import { onDataChanged } from '../../utils/refreshBus';
 import './SideMenu.css';
 
 const PRODUCT_ICONS: Partial<Record<ProductContext, string>> = {
-  borrower: walletOutline, lender: cashOutline, juridical: briefcaseOutline,
+  borrower: walletOutline, lender: cashOutline, juridical: briefcaseOutline, admin: shieldCheckmarkOutline,
 };
 
 /**
@@ -55,7 +55,7 @@ const SideMenu: React.FC = () => {
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
 
   const products = availableProducts.filter(isSmartLoansProduct);
-  const canAddProduct = products.length < SMARTLOANS_PRODUCTS.length;
+  const canAddProduct = ENROLLABLE_PRODUCTS.some(p => !products.includes(p));
 
   const switchProduct = (product: ProductContext) => {
     console.log('[SideMenu] switching product →', product);

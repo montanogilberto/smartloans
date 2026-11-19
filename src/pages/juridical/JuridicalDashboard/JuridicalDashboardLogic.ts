@@ -25,11 +25,13 @@ export type LegalTemplate = typeof LEGAL_TEMPLATES[number];
  */
 export function useJuridicalDashboard() {
   const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
-  const { clientId: contextClientId, companyId, roleCode, username, clientCapabilities } = useUser();
+  const { clientId: contextClientId, companyId, roleCode, username, clientCapabilities, isPlatformAdmin } = useUser();
   // Same rule as MyLoans: the URL id only counts for staff.
   const paramId = clientIdParam ? Number(clientIdParam) : null;
-  const clientId = paramId !== null && isStaffRole(roleCode) ? paramId : contextClientId;
-  const isMember = isStaffRole(roleCode) || hasCapability(clientCapabilities, 'SMARTLOANS_JURIDICAL');
+  // The platform admin (utils/platformAdmin.ts) reviews any lawyer's panel too.
+  const canViewOthers = isStaffRole(roleCode) || isPlatformAdmin;
+  const clientId = paramId !== null && canViewOthers ? paramId : contextClientId;
+  const isMember = canViewOthers || hasCapability(clientCapabilities, 'SMARTLOANS_JURIDICAL');
 
   const [items, setItems] = useState<ClientFollowUp[]>([]);
   const [loading, setLoading] = useState(false);

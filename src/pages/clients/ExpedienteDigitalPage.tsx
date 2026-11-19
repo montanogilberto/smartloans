@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { pinnedClientId } from '../../utils/ownClientId';
 import { useParams } from 'react-router-dom';
 import {
   IonPage,
@@ -76,7 +77,9 @@ const DocSlot: React.FC<DocSlotProps> = ({ title, url, kind, meta }) => (
 
 const ExpedienteDigitalPage: React.FC = () => {
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
-  const clientId = Number(clientIdParam);
+  const { clientId: sessionClientId, roleCode: sessionRoleCode } = useUser();
+  // Self-service sessions only ever see their OWN expediente (utils/ownClientId).
+  const clientId = pinnedClientId(clientIdParam, sessionClientId, sessionRoleCode);
   const { confirmBack } = useExitConfirm();
   const { companyId } = useUser();
 

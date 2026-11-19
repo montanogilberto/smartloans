@@ -18,6 +18,7 @@ import P2PLendingPage from './pages/loans/P2PLendingPage';
 import LoanChatPage from './pages/loans/LoanChatPage';
 import JuridicalDashboardPage from './pages/juridical/JuridicalDashboardPage';
 import InvitePage from './pages/invite/InvitePage';
+import AdminPage from './pages/admin/AdminPage';
 import ClientDashboardPage from './pages/clients/ClientDashboardPage';
 import BorrowerOnboardingPage from './pages/loans/BorrowerOnboardingPage';
 import LoanPaymentPage from './pages/loans/LoanPaymentPage';
@@ -111,6 +112,8 @@ const App: React.FC = () => (
             <PrivateRoute exact path="/client-face-recognition" component={ToIdentityVerification} />
             <PrivateRoute exact path="/clientFaceRecognitions" component={ClientFaceRecognitionPage} />
             <PrivateRoute exact path="/client-expediente/:clientId" component={ExpedienteDigitalPage} />
+            {/* GMO Prestamos platform admin (one phone — config/appCompany.ts). */}
+            <PrivateRoute exact path="/admin/:section?" component={AdminPage} />
             <PrivateRoute exact path="/rewards" component={InvitePage} />
             <PrivateRoute exact path="/loan-chats" component={LoanChatListPage} />
             <PrivateRoute exact path="/profile" component={ProfilePage} />

@@ -3,7 +3,7 @@ import { IonButton, IonIcon } from '@ionic/react';
 import { useHistory, useLocation } from 'react-router-dom';
 import {
   homeOutline, documentTextOutline, cardOutline, barChart, peopleOutline, chatbubblesOutline,
-  walletOutline, pulseOutline, personCircleOutline,
+  walletOutline, pulseOutline, personCircleOutline, speedometerOutline, briefcaseOutline, cashOutline,
 } from 'ionicons/icons';
 import { useUser } from '../../contexts/UserContext';
 import { actsAsBorrower, actsAsLender } from '../../utils/productContext';
@@ -23,6 +23,7 @@ interface Tab { id: string; label: string; icon: string; to: string }
  * are ?tab= sections of the ONE borrower dashboard route, so the active tab is
  * read from the query string (IonTabs matches by path only).
  * Juridical: Inicio / Perfil, the small bar POS gives own-dashboard products.
+ * Admin: Resumen / Préstamos / Acreditados / Prestamistas / Jurídico / KPI.
  */
 const BottomTabBar: React.FC = () => {
   const history = useHistory();
@@ -30,10 +31,11 @@ const BottomTabBar: React.FC = () => {
   const { isAuthenticated, roleCode, activeProduct, clientId } = useUser();
 
   if (!isAuthenticated) return null;
+  const isAdmin = activeProduct === 'admin';
   const isLender = actsAsLender(roleCode, activeProduct);
   const isBorrower = !isLender && actsAsBorrower(roleCode, activeProduct);
   const isJuridical = !isLender && !isBorrower && activeProduct === 'juridical';
-  if (!isLender && !isBorrower && !isJuridical) return null;
+  if (!isAdmin && !isLender && !isBorrower && !isJuridical) return null;
 
   const { pathname } = location;
   const query = new URLSearchParams(location.search);
@@ -42,7 +44,22 @@ const BottomTabBar: React.FC = () => {
   let tabs: Tab[];
   let active: string;
 
-  if (isLender) {
+  if (isAdmin) {
+    // /admin/:section — anything else opened from the admin (a loan, a client's
+    // dashboard) keeps the tab it was opened from highlighted by its path.
+    const section = pathname.startsWith('/admin') ? (pathname.split('/')[2] || 'resumen') : '';
+    active = section === 'proposals' ? 'loans'
+      : pathname.startsWith('/loan-detail') ? 'loans'
+      : section;
+    tabs = [
+      { id: 'resumen', label: 'Resumen', icon: speedometerOutline, to: '/admin' },
+      { id: 'loans', label: 'Préstamos', icon: documentTextOutline, to: '/admin/loans' },
+      { id: 'borrowers', label: 'Acreditados', icon: walletOutline, to: '/admin/borrowers' },
+      { id: 'lenders', label: 'Prestamistas', icon: cashOutline, to: '/admin/lenders' },
+      { id: 'juridical', label: 'Jurídico', icon: briefcaseOutline, to: '/admin/juridical' },
+      { id: 'kpi', label: 'KPI', icon: barChart, to: '/admin/kpi' },
+    ];
+  } else if (isLender) {
     const section = query.get('section');
     active = onChat ? 'chat'
       : pathname.startsWith('/p2p-lending') ? 'invertir'

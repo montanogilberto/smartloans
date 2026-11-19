@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
 import {
   IonPage,
+  IonFooter,
   IonContent,
   IonButton,
   IonLoading,
@@ -36,6 +37,7 @@ import SavedCardSetup from '../../components/payments/SavedCardSetup';
 import NativeConnectOnboarding from '../../components/payments/NativeConnectOnboarding';
 import { buildKycPrefill, kycFieldsToIne } from '../../utils/kycPrefill';
 import { actsAsLender } from '../../utils/productContext';
+import { isStaffRole } from '../../config/rolePermissions';
 import { validateFaceSession, FaceValidationResult } from '../../api/faceValidationApi';
 import { useUser } from '../../contexts/UserContext';
 import { saveProfileImage } from '../../api/usersApi';
@@ -104,7 +106,12 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // down the next item themselves. returnTo lets either dashboard say where
   // "done" goes back to — defaults to the borrower dashboard for callers
   // that predate this (e.g. old deep links) that don't pass it.
-  const deepLinkClientId = location.state?.clientId;
+  // A customer's KYC is ALWAYS their own record: self-service sessions are
+  // pinned to the session clientId and never trust one passed in navigation
+  // state (rolePermissions.ts STAFF_ROLES). Only staff verify someone else,
+  // through the client picker.
+  const isStaff = isStaffRole(roleCode);
+  const deepLinkClientId = isStaff ? location.state?.clientId : (contextClientId || undefined);
   const continueToPayments = !!location.state?.continueToPayments;
   // Default "done" destination is role-aware: a lender must return to the LENDER
   // dashboard, not the borrower one. Only used when the caller didn't pass an
@@ -1353,11 +1360,19 @@ const ClientFaceRecognitionPage: React.FC = () => {
             <IonCardTitle>Paso 1: Cliente y Documento</IonCardTitle>
           </IonCardHeader>
           <IonCardContent>
-            <p>Selecciona un cliente y el tipo de documento: INE, Pasaporte o Licencia de Conducir.</p>
+            <p>{isStaff
+              ? 'Selecciona un cliente y el tipo de documento: INE, Pasaporte o Licencia de Conducir.'
+              : 'Elige el tipo de documento con el que vas a verificar tu identidad: INE, Pasaporte o Licencia de Conducir.'}</p>
 
-            <IonButton expand="block" fill="outline" onClick={() => setClientSelectorOpen(true)} className="ion-margin-top">
-              {selectedClient ? `Cliente: ${selectedClient.first_name} ${selectedClient.last_name}` : 'Seleccionar cliente'}
-            </IonButton>
+            {isStaff ? (
+              <IonButton expand="block" fill="outline" onClick={() => setClientSelectorOpen(true)} className="ion-margin-top">
+                {selectedClient ? `Cliente: ${selectedClient.first_name} ${selectedClient.last_name}` : 'Seleccionar cliente'}
+              </IonButton>
+            ) : (
+              <p className="cfr-own-client">
+                Verificación de: <strong>{selectedClient ? `${selectedClient.first_name} ${selectedClient.last_name}` : 'tu cuenta'}</strong>
+              </p>
+            )}
 
             <IonList className="client-face-recognition-radio-list ion-margin-top">
               <IonListHeader>
@@ -1588,12 +1603,15 @@ const ClientFaceRecognitionPage: React.FC = () => {
       <AlertPopover {...pops.alertPopoverProps} />
       <MailPopover {...pops.mailPopoverProps} />
 
-      <ClientSelector
-        isOpen={clientSelectorOpen}
-        onClose={() => setClientSelectorOpen(false)}
-        selectedClient={selectedClient}
-        onChange={(client) => setSelectedClient(client)}
-      />
+      {/* Staff only: lists every client of the company. */}
+      {isStaff && (
+        <ClientSelector
+          isOpen={clientSelectorOpen}
+          onClose={() => setClientSelectorOpen(false)}
+          selectedClient={selectedClient}
+          onChange={(client) => setSelectedClient(client)}
+        />
+      )}
 
       <IonLoading isOpen={loading} message={'Por favor espera...'} />
       <IonToast
@@ -1613,7 +1631,11 @@ const ClientFaceRecognitionPage: React.FC = () => {
         {renderStepContent()}
       </IonContent>
 
-      <Footer />
+      {/* IonFooter, not a bare div: after a full-height IonContent the div was
+          painted under the content, hiding "Siguiente" (step 1 looked stuck). */}
+      <IonFooter className="cfr-footer">
+        <Footer />
+      </IonFooter>
     </IonPage>
   );
 };

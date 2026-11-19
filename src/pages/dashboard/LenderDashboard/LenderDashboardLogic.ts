@@ -2,6 +2,7 @@
  * useLenderDashboard — ViewModel del dashboard del prestamista (MVVM).
  * Todo el estado, efectos, fetchers y cálculos viven aquí; la View solo pinta.
  */
+import { pinnedClientId } from '../../../utils/ownClientId';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useHistory, useLocation } from 'react-router-dom';
 import { useIonViewWillEnter } from '@ionic/react';
@@ -32,9 +33,10 @@ export function useLenderDashboard() {
     }, 350);
     return () => clearTimeout(t);
   }, [location.search]);
-  const { companyId } = useUser();
+  const { companyId, clientId: sessionClientId, roleCode: sessionRoleCode } = useUser();
 
-  const lenderClientId = Number(clientIdParam);
+  // Self-service sessions are pinned to their own clientId (utils/ownClientId).
+  const lenderClientId = pinnedClientId(clientIdParam, sessionClientId, sessionRoleCode);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

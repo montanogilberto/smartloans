@@ -18,6 +18,10 @@ describe('smartLoansLanding', () => {
     expect(smartLoansLanding(['pos', 'factory'], 'pos', 7)).toBeNull();
   });
 
+  it('sends the platform admin to the admin dashboard first', () => {
+    expect(smartLoansLanding(['admin', 'borrower'], null, 7)).toBe('/admin');
+  });
+
   it('returns null without a client record', () => {
     expect(smartLoansLanding(['borrower'], 'borrower', 0)).toBeNull();
   });

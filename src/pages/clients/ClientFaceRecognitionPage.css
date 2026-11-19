@@ -358,3 +358,17 @@
   color: #6b7280;
   margin: 0;
 }
+
+/* GMO Prestamos: a customer's own name instead of the staff client picker. */
+.cfr-own-client {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(5, 150, 105, 0.08);
+  color: #065f46;
+}
+
+/* The wizard footer now lives in an IonFooter (was hidden under IonContent). */
+.cfr-footer {
+  box-shadow: none;
+}

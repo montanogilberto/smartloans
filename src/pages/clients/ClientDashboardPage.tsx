@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { pinnedClientId } from '../../utils/ownClientId';
 import { useParams, useHistory, useLocation } from 'react-router-dom';
 import {
   IonPage,
@@ -222,7 +223,8 @@ const ClientDashboardPage: React.FC = () => {
   // for a payout account, so the checklist must not gate them on one.
   const isPayoutClient = hasCapability(clientCapabilities, 'SMARTLOANS_LENDER')
     || clientType === 'lender' || clientType === 'both' || roleCode === 'lender';
-  const clientId = clientIdParam ? Number(clientIdParam) : contextClientId;
+  // Self-service sessions are pinned to their own clientId (utils/ownClientId).
+  const clientId = pinnedClientId(clientIdParam, contextClientId, roleCode);
 
   console.log('[ClientDashboard] render. clientId =', clientId, 'companyId =', companyId, 'tab query =', location.search);
 

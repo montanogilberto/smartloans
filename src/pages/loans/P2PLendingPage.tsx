@@ -9,6 +9,7 @@
  * The entire negotiation is driven by push notifications (payloadJson).
  * Proposals are also persisted via loanProposalApi.
  */
+import { pinnedClientId } from '../../utils/ownClientId';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons,
@@ -259,7 +260,8 @@ const P2PLendingPage: React.FC = () => {
   // contexto de sesión es el fallback.
   const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
   const { clientId: contextClientId, companyId, userId, roleCode, clientCapabilities } = useUser();
-  const clientId = clientIdParam ? Number(clientIdParam) : contextClientId;
+  // Self-service sessions are pinned to their own clientId (utils/ownClientId).
+  const clientId = pinnedClientId(clientIdParam, contextClientId, roleCode);
   console.log('[P2P] render. clientId =', clientId, '(param:', clientIdParam ?? '—', '/ context:', contextClientId, ') companyId =', companyId);
 
   // Determine the role of the logged-in client
