@@ -22,6 +22,8 @@ export interface ClientFaceRecognition {
   /** RFC-015: INE back identifiers (9 / 13 digits). */
   cic?: string;
   ocr?: string;
+  /** RFC-015: last year of the INE 'VIGENCIA'. */
+  vigencia?: string;
   rfc?: string; // Mexico tax ID (Stripe individual.id_number) — NOT the CURP
   fechaNacimiento?: string;
 
@@ -87,6 +89,8 @@ export interface ContractSubmissionRequest {
   claveElector?: string;
   cic?: string;
   ocr?: string;
+  /** RFC-015: last year of the INE 'VIGENCIA'. */
+  vigencia?: string;
   rfc?: string; // Mexico tax ID (Stripe individual.id_number) — NOT the CURP
   fechaNacimiento?: string;
 

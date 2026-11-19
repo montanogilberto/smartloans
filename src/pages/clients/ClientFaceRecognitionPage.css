@@ -372,3 +372,13 @@
 .cfr-footer {
   box-shadow: none;
 }
+
+/* RFC-015: expired or unreadable INE vigencia (blocks "Continuar"). */
+.cfr-vigencia-problem {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(220, 38, 38, 0.08);
+  color: #991b1b;
+  font-weight: 600;
+}

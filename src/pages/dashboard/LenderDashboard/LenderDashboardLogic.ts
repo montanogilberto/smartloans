@@ -298,6 +298,8 @@ export function useLenderDashboard() {
       label: 'Verifica tu identidad',
       detail: identityVerified ? 'Identidad verificada' : `${verificationDone} de ${verificationSteps.length} pasos completados`,
       done: identityVerified,
+      // Sub-progress of the KYC (INE, selfie, presencia, biometría, contrato, pagaré).
+      progress: identityVerified ? 1 : verificationDone / verificationSteps.length,
       cta: verificationDone > 0 ? 'Continuar' : 'Verificar',
       action: handleStartVerification,
     },
@@ -323,7 +325,12 @@ export function useLenderDashboard() {
     },
   ];
   const setupDone = setupSteps.filter(s => s.done).length;
-  const setupPct = Math.round((setupDone / setupSteps.length) * 100);
+  // Partial credit for a step in progress (4 of 6 KYC pieces = 2/3 of a step),
+  // so the bar moves as soon as the lender starts instead of sitting at 0%.
+  const setupProgress = setupSteps.reduce(
+    (sum, s) => sum + (s.done ? 1 : ('progress' in s ? s.progress ?? 0 : 0)), 0,
+  ) / setupSteps.length;
+  const setupPct = Math.round(setupProgress * 100);
   const setupLoaded = baseLoaded && bankAccountsLoaded && offersLoaded;
   // The next step to do: the first one not done (steps are meant in order).
   const setupNextId = setupSteps.find(s => !s.done)?.id ?? null;
@@ -406,7 +413,7 @@ export function useLenderDashboard() {
     faceRecord, wizardStarting, handleStartVerification,
     verificationSteps, verificationDone, verificationInReview,
     // primeros pasos (new-lender setup)
-    setupSteps, setupDone, setupPct, setupLoaded, setupNextId,
+    setupSteps, setupDone, setupPct, setupProgress, setupLoaded, setupNextId,
     // stripe
     stripeAccount, stripeLoading, stripeError, showStripeOnboarding,
     setShowStripeOnboarding,

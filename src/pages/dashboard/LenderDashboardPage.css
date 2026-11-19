@@ -722,6 +722,29 @@
   margin: 12px 0 8px;
 }
 
+/* Progress of a step already started (e.g. identity 4 de 6). */
+.ld-setup-step-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.ld-setup-step-bar {
+  --background: rgba(37, 99, 235, 0.15);
+  --progress-background: var(--ion-color-primary, #2563eb);
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+}
+
+.ld-setup-step-progress span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ion-color-primary, #2563eb);
+  font-variant-numeric: tabular-nums;
+}
+
 .ld-setup-steps {
   list-style: none;
   margin: 0;

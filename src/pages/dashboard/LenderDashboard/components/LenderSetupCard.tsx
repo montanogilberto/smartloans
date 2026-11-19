@@ -6,7 +6,7 @@ import { LenderDashboardVM } from '../LenderDashboardLogic';
 /**
  * Primeros pasos — the 3 things a new lender must finish before lending:
  * verify identity, register the payout CLABE, publish capital. Shows the
- * completion % (33 / 67 / 100) and hides itself once all three are done.
+ * completion % — with partial credit for a step in progress — and hides itself once all three are done.
  * Waits for the first load: never a "0%" before the data is in.
  */
 const LenderSetupCard: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => {
@@ -33,7 +33,7 @@ const LenderSetupCard: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => {
                 {vm.setupPct}%
               </div>
             </div>
-            <IonProgressBar className="ld-setup-bar" value={vm.setupDone / vm.setupSteps.length} />
+            <IonProgressBar className="ld-setup-bar" value={vm.setupProgress} />
 
             <ol className="ld-setup-steps">
               {vm.setupSteps.map((step, i) => {
@@ -51,6 +51,13 @@ const LenderSetupCard: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => {
                     <div className="ld-setup-step-text">
                       <strong>{i + 1}. {step.label}</strong>
                       <span>{step.detail}</span>
+                      {/* A step already started shows how far along it is (e.g. 4 de 6 = 67%). */}
+                      {!step.done && 'progress' in step && (step.progress ?? 0) > 0 && (
+                        <div className="ld-setup-step-progress">
+                          <IonProgressBar className="ld-setup-step-bar" value={step.progress} />
+                          <span>{Math.round((step.progress ?? 0) * 100)}%</span>
+                        </div>
+                      )}
                     </div>
                     {!step.done && (
                       <IonButton

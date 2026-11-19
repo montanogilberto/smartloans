@@ -18,7 +18,7 @@ interface IdExtractedFieldsSummaryProps {
 // on nearly every call against the same photo) — kept here as manual-entry
 // fields the client fills in by hand.
 /** Digit-only fields and their exact length (RFC-015). */
-const DIGIT_FIELDS: Partial<Record<keyof ExtractedIdFields, number>> = { cic: 9, ocr: 13 };
+const DIGIT_FIELDS: Partial<Record<keyof ExtractedIdFields, number>> = { cic: 9, ocr: 13, vigencia: 4 };
 
 const FIELD_LABELS: Array<{ key: keyof ExtractedIdFields; label: string }> = [
   { key: 'nombre', label: 'Nombre' },
@@ -29,6 +29,7 @@ const FIELD_LABELS: Array<{ key: keyof ExtractedIdFields; label: string }> = [
   // RFC-015: back of the INE (machine-readable zone). Used to verify the credential with the INE.
   { key: 'cic', label: 'CIC (reverso, 9 dígitos)' },
   { key: 'ocr', label: 'OCR (reverso, 13 dígitos)' },
+  { key: 'vigencia', label: 'Vigencia (último año)' },
 ];
 
 // Pure display/edit component — the OCR fetch itself runs in the parent

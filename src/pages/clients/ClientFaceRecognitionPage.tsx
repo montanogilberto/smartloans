@@ -43,6 +43,7 @@ import SavedCardSetup from '../../components/payments/SavedCardSetup';
 import NativeConnectOnboarding from '../../components/payments/NativeConnectOnboarding';
 import { buildKycPrefill, kycFieldsToIne } from '../../utils/kycPrefill';
 import { actsAsLender } from '../../utils/productContext';
+import { ineVigenciaProblem, parseVigenciaYear } from '../../utils/ineVigencia';
 import { isStaffRole } from '../../config/rolePermissions';
 import { validateFaceSession, FaceValidationResult } from '../../api/faceValidationApi';
 import { useUser } from '../../contexts/UserContext';
@@ -74,6 +75,7 @@ const EMPTY_EXTRACTED_ID_FIELDS: ExtractedIdFields = {
   fechaNacimiento: '',
   cic: '',
   ocr: '',
+  vigencia: '',
 };
 
 // Sub-steps inside the capture wizard step
@@ -195,6 +197,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
           // RFC-015: only present once the all-records SP returns them; '' until then.
           cic: record.cic ?? '',
           ocr: record.ocr ?? '',
+          vigencia: record.vigencia ?? '',
         };
         if (Object.values(extracted).some(Boolean)) setExtractedIdFields(extracted);
 
@@ -257,6 +260,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const [livenessStatus, setLivenessStatus] = useState<'idle' | 'ready' | 'in-progress' | 'completed' | 'failed'>('idle');
   const [idInfoConfirmed, setIdInfoConfirmed] = useState<boolean>(false);
   const [extractedIdFields, setExtractedIdFields] = useState<ExtractedIdFields>(EMPTY_EXTRACTED_ID_FIELDS);
+  // RFC-015: an expired (or unreadable) INE vigencia blocks the KYC — INE only;
+  // passports and licences expire differently.
+  const vigenciaProblem = documentType === 'INE' ? ineVigenciaProblem(extractedIdFields.vigencia) : null;
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrError, setOcrError] = useState('');
   const ocrRanForRef = useRef('');
@@ -486,6 +492,10 @@ const ClientFaceRecognitionPage: React.FC = () => {
       console.log(`[Expediente] uploadCapturedImage(${side}): uploaded to blob →`, blobUrl);
       if (side === 'front') setIdFrontImageBlobUrl(blobUrl);
       if (side === 'back') setIdBackImageBlobUrl(blobUrl);
+      // Pose photos (selfie_front/up/down/left/right) are evidence files only.
+      // They used to fall through to clientSelfieBlobUrl below, so whichever
+      // pose uploaded last (often selfie_left) became the person's picture.
+      if (side !== 'front' && side !== 'back' && side !== 'selfie') return blobUrl;
       const record = await upsertClientFaceRecognition(
         Number(companyId),
         selectedClient.clientId,
@@ -590,7 +600,10 @@ const ClientFaceRecognitionPage: React.FC = () => {
       const localConfidence = distanceToConfidence(distance);
       console.log('[Expediente] handleLivenessComplete: LOCAL match — distance =', distance.toFixed(4), 'confidence =', localConfidence.toFixed(4), 'isMatch =', localMatch);
 
-      const selfieBlobUrl = await uploadCapturedImage('selfie', result.selfieBase64);
+      // The stored selfie is the person's picture across the app (dashboards,
+      // marketplace): use the front-facing pose, not the challenge's last frame,
+      // which is often mid head-turn.
+      const selfieBlobUrl = await uploadCapturedImage('selfie', result.posePhotos.front ?? result.selfieBase64);
 
       // Upload the five head positions captured during the challenge. These
       // are the evidence set the validation agent scores (front/up/down/
@@ -768,6 +781,12 @@ const ClientFaceRecognitionPage: React.FC = () => {
   };
 
   const handleSubmitContract = async () => {
+    // Last guard (the Datos step already blocks it): never submit an expired INE.
+    if (vigenciaProblem) {
+      setError(vigenciaProblem);
+      setShowToast(true);
+      return;
+    }
     // confidenceScore now comes from the validation agent's whole-session
     // verdict, not the local two-descriptor comparison — 'scoreSource' makes
     // clear which produced it, because a local-fallback score means the agent
@@ -829,6 +848,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
         // RFC-015: digits only; the backend keeps them only at exactly 9 / 13 digits.
         cic: cap(extractedIdFields.cic.replace(/\D/g, ''), 9),
         ocr: cap(extractedIdFields.ocr.replace(/\D/g, ''), 13),
+        vigencia: String(parseVigenciaYear(extractedIdFields.vigencia) ?? ''),
       };
 
       const pdfParams = {
@@ -862,6 +882,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
         fechaNacimiento: idf.fechaNacimiento,
         cic: idf.cic,
         ocr: idf.ocr,
+        vigencia: idf.vigencia,
         contractAccepted: true,
         contractPdfBase64: generateContractPdfBase64(pdfParams),
         contractAcceptedAt: now,
@@ -1132,7 +1153,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
         )}
         {step === 3 && (
           // Datos reviewed (fields stay editable); the documents come next.
-          <button className="wizard-footer-next" onClick={() => setStep(4)}>
+          <button className="wizard-footer-next" onClick={() => setStep(4)} disabled={!!vigenciaProblem}>
             Continuar <IonIcon icon={chevronForward} />
           </button>
         )}
@@ -1521,6 +1542,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
             ocrLoading={ocrLoading}
             ocrError={ocrError}
           />
+          {!ocrLoading && vigenciaProblem && (
+            <p className="cfr-vigencia-problem" role="alert">{vigenciaProblem}</p>
+          )}
         </IonCardContent>
       </IonCard>
     );

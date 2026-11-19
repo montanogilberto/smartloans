@@ -28,6 +28,8 @@ export interface ExtractedIdFields {
   cic: string;
   /** RFC-015: 13 digits after '<<' on the first MRZ line, or ''. */
   ocr: string;
+  /** RFC-015: last year of the front's 'VIGENCIA' (e.g. '2033'), or ''. */
+  vigencia: string;
 }
 
 export interface IdExtractionResult {
@@ -43,6 +45,7 @@ const EMPTY_FIELDS: ExtractedIdFields = {
   fechaNacimiento: '',
   cic: '',
   ocr: '',
+  vigencia: '',
 };
 
 const EMPTY_RESULT: IdExtractionResult = {

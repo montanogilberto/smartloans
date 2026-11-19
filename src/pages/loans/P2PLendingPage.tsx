@@ -208,6 +208,7 @@ import { getChatConfig } from '../../api/loanChatApi';
 import { createLoanContract } from '../../api/digitalContractsApi';
 import './P2PLendingPage.css';
 import { API_BASE_URL } from '../../utils/appEnv';
+import SelfieImage from '../../components/ui/SelfieImage';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -1535,7 +1536,7 @@ const P2PLendingPage: React.FC = () => {
                   <IonCard key={offer.offerId} className="p2p-offer-card">
                     <div className="p2p-offer-header">
                       {lenderBio?.clientSelfieBlobUrl
-                        ? <IonAvatar className="p2p-offer-avatar"><img src={lenderBio.clientSelfieBlobUrl} alt="lender" /></IonAvatar>
+                        ? <IonAvatar className="p2p-offer-avatar"><SelfieImage url={lenderBio.clientSelfieBlobUrl} alt="lender" /></IonAvatar>
                         : <IonAvatar className="p2p-offer-avatar-placeholder"><IonIcon icon={personOutline} /></IonAvatar>}
                       <div className="p2p-offer-info">
                         <p className="p2p-offer-name">{lender ? `${lender.first_name} ${lender.last_name}` : `Prestamista #${offer.lenderId}`}</p>

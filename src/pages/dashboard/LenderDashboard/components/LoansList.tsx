@@ -7,6 +7,7 @@ import { personCircleOutline, timeOutline, walletOutline } from 'ionicons/icons'
 import { statusColor, statusIcon, statusLabel, toDate } from '../LenderDashboardConstants';
 import { LenderDashboardVM } from '../LenderDashboardLogic';
 import { myLoansRoute, p2pLendingRoute } from '../../../../utils/routes';
+import SelfieImage from '../../../../components/ui/SelfieImage';
 
 /** Préstamos otorgados — lista del portafolio con estado por préstamo. */
 const LoansList: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
@@ -38,7 +39,7 @@ const LoansList: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
               button onClick={() => { console.log('[LenderDashboard] loan →', loan.loanId); vm.history.push(`/loan-detail/${loan.loanId}`); }}>
               <div slot="start" className="ld-borrower-avatar">
                 {vm.selfieMap[loan.clientId]
-                  ? <img src={vm.selfieMap[loan.clientId]} alt="borrower" />
+                  ? <SelfieImage url={vm.selfieMap[loan.clientId]} alt="borrower" />
                   : <IonIcon icon={personCircleOutline} style={{ fontSize: 32, color: '#9ca3af' }} />}
               </div>
               <IonLabel>
