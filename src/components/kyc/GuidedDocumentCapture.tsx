@@ -36,24 +36,65 @@ function getImageCaptureConstructor(): ImageCaptureConstructor | undefined {
 // it, and quietly report "not supported" rather than assume it works.
 interface FocusTrackCapabilities {
   focusMode?: string[];
+  exposureMode?: string[];
+  whiteBalanceMode?: string[];
 }
 
-async function tryAutofocus(track: MediaStreamTrack): Promise<boolean> {
-  const capableTrack = track as unknown as { getCapabilities?: () => FocusTrackCapabilities };
-  const modes = capableTrack.getCapabilities?.()?.focusMode ?? [];
-  // 'single-shot' forces one fresh focus pass — closer to a real
-  // tap-to-focus. Fall back to re-applying 'continuous', which on several
-  // Android camera stacks is enough to nudge a stuck autofocus into
-  // re-hunting even without single-shot support.
-  const mode = modes.includes('single-shot') ? 'single-shot' : modes.includes('continuous') ? 'continuous' : undefined;
-  if (!mode) return false;
+/** A point in the camera image, 0–1 from the top-left (Image Capture pointsOfInterest). */
+interface FocusPoint { x: number; y: number }
+
+const trackCapabilities = (track: MediaStreamTrack): FocusTrackCapabilities =>
+  (track as unknown as { getCapabilities?: () => FocusTrackCapabilities }).getCapabilities?.() ?? {};
+
+const supportsPointsOfInterest = (): boolean =>
+  !!(navigator.mediaDevices?.getSupportedConstraints?.() as Record<string, boolean> | undefined)?.pointsOfInterest;
+
+// Each setting is applied on its own: one a camera rejects must not cancel the others.
+async function applyAdvanced(track: MediaStreamTrack, constraint: Record<string, unknown>): Promise<boolean> {
   try {
-    await track.applyConstraints({ advanced: [{ focusMode: mode }] } as unknown as MediaTrackConstraints);
+    await track.applyConstraints({ advanced: [constraint] } as unknown as MediaTrackConstraints);
     return true;
   } catch {
     return false;
   }
 }
+
+/**
+ * Camera set-up for a document a few cm away: keep focus, exposure and white
+ * balance adjusting on their own, aimed at the INE frame (centre of the view).
+ * Without this, many Android cameras keep the default focus on the background.
+ */
+async function setupDocumentCamera(track: MediaStreamTrack): Promise<void> {
+  const caps = trackCapabilities(track);
+  const applied: string[] = [];
+  if (caps.focusMode?.includes('continuous') && await applyAdvanced(track, { focusMode: 'continuous' })) applied.push('focus');
+  if (caps.exposureMode?.includes('continuous') && await applyAdvanced(track, { exposureMode: 'continuous' })) applied.push('exposure');
+  if (caps.whiteBalanceMode?.includes('continuous') && await applyAdvanced(track, { whiteBalanceMode: 'continuous' })) applied.push('whiteBalance');
+  if (supportsPointsOfInterest() && await applyAdvanced(track, { pointsOfInterest: [{ x: 0.5, y: 0.5 }] })) applied.push('pointOfInterest');
+  console.log('[GuidedDocumentCapture] camera setup', JSON.stringify({ applied, focusModes: caps.focusMode ?? [] }));
+}
+
+/**
+ * One fresh focus pass, optionally at a point (tap-to-focus). 'single-shot'
+ * is a real refocus; re-applying 'continuous' is enough on several Android
+ * stacks to make a stuck autofocus hunt again. False = the camera has no
+ * focus control (e.g. iOS WebView, which autofocuses on its own).
+ */
+async function tryAutofocus(track: MediaStreamTrack, point?: FocusPoint): Promise<boolean> {
+  const modes = trackCapabilities(track).focusMode ?? [];
+  const mode = modes.includes('single-shot') ? 'single-shot' : modes.includes('continuous') ? 'continuous' : undefined;
+  if (point && supportsPointsOfInterest()) await applyAdvanced(track, { pointsOfInterest: [point] });
+  if (!mode) return false;
+  const ok = await applyAdvanced(track, { focusMode: mode });
+  // single-shot locks after focusing: go back to continuous so it keeps tracking the card.
+  if (ok && mode === 'single-shot' && modes.includes('continuous')) {
+    setTimeout(() => { void applyAdvanced(track, { focusMode: 'continuous' }); }, 1200);
+  }
+  return ok;
+}
+
+/** While the card is not in focus, refocus on it this often. */
+const AUTO_REFOCUS_MS = 3500;
 
 const POSITION_HINT_LABEL: Record<PositionHint, string> = {
   'move-closer': 'Acércate un poco',
@@ -210,6 +251,8 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [positionHint, setPositionHint] = useState<PositionHint>('move-closer');
   const [focusMessage, setFocusMessage] = useState('');
+  /** Where the last tap-to-focus landed, in container px (shows a focus ring). */
+  const [tapRing, setTapRing] = useState<{ x: number; y: number } | null>(null);
   const [rejectionMessage, setRejectionMessage] = useState('');
 
   const stopStream = useCallback(() => {
@@ -418,6 +461,11 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
       );
       setRejectionMessage(reason);
       setTimeout(() => setRejectionMessage(''), 4000);
+      // A blurry shot usually means focus is on the background: refocus on the card.
+      if (tooBlurry) {
+        const blurTrack = streamRef.current?.getVideoTracks()[0];
+        if (blurTrack) void tryAutofocus(blurTrack, { x: 0.5, y: 0.5 });
+      }
       // Resume scanning: the stream is still live, so just clear the latch
       // and restart the analysis loop for another attempt.
       consecutiveGoodRef.current = 0;
@@ -465,6 +513,40 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
       setTimeout(() => setFocusMessage(''), 3000);
     }
   }, []);
+
+  // Tap the card to focus there. The video is drawn with object-fit: cover,
+  // so the tap is mapped from the screen to the camera image's coordinates.
+  const handleTapToFocus = useCallback(async (e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('.gdc-controls')) return;
+    const track = streamRef.current?.getVideoTracks()[0];
+    const video = videoRef.current;
+    const container = containerRef.current;
+    if (!track || !video || !container || !video.videoWidth) return;
+    const box = container.getBoundingClientRect();
+    const cx = e.clientX - box.left;
+    const cy = e.clientY - box.top;
+    const scale = Math.max(box.width / video.videoWidth, box.height / video.videoHeight);
+    const offsetX = (video.videoWidth * scale - box.width) / 2;
+    const offsetY = (video.videoHeight * scale - box.height) / 2;
+    const point = {
+      x: Math.min(1, Math.max(0, (cx + offsetX) / (video.videoWidth * scale))),
+      y: Math.min(1, Math.max(0, (cy + offsetY) / (video.videoHeight * scale))),
+    };
+    setTapRing({ x: cx, y: cy });
+    setTimeout(() => setTapRing(null), 900);
+    await tryAutofocus(track, point);
+  }, []);
+
+  // While the frame is still searching/aligning, refocus on the card every few
+  // seconds — no need to find the "Enfocar" button.
+  useEffect(() => {
+    if (state !== 'searching' && state !== 'aligning') return;
+    const timer = setInterval(() => {
+      const track = streamRef.current?.getVideoTracks()[0];
+      if (track) void tryAutofocus(track, { x: 0.5, y: 0.5 });
+    }, AUTO_REFOCUS_MS);
+    return () => clearInterval(timer);
+  }, [state]);
 
   const tick = useCallback(
     (timestamp: number) => {
@@ -572,7 +654,13 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
         }
 
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            // Ask for continuous autofocus from the start where supported (ignored elsewhere).
+            advanced: [{ focusMode: 'continuous' } as unknown as MediaTrackConstraintSet],
+          },
           audio: false,
         });
         if (cancelled) {
@@ -580,6 +668,8 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
           return;
         }
         streamRef.current = stream;
+        const camTrack = stream.getVideoTracks()[0];
+        if (camTrack) void setupDocumentCamera(camTrack);
         const video = videoRef.current;
         if (video) {
           video.srcObject = stream;
@@ -610,7 +700,7 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
   const isGood = state === 'stable' || state === 'captured';
 
   return (
-    <div className="gdc-root" ref={containerRef}>
+    <div className="gdc-root" ref={containerRef} onClick={handleTapToFocus}>
       <video ref={videoRef} className="gdc-video" autoPlay playsInline muted />
       <canvas ref={analysisCanvasRef} className="gdc-hidden-canvas" />
       <canvas ref={captureCanvasRef} className="gdc-hidden-canvas" />
@@ -653,6 +743,8 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
           <p>{errorMessage}</p>
         </div>
       )}
+
+      {tapRing && <div className="gdc-tap-ring" style={{ left: tapRing.x, top: tapRing.y }} aria-hidden="true" />}
 
       {focusMessage && <div className="gdc-focus-message">{focusMessage}</div>}
 

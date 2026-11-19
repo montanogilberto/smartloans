@@ -2,6 +2,9 @@ import { jsPDF } from 'jspdf';
 import { CONTRACT_TEXT } from '../pages/loans/BorrowerOnboarding/documents/contract';
 import { PAGARE_TEXT } from '../pages/loans/BorrowerOnboarding/documents/pagare';
 import { RESGUARDO_TEXT } from '../pages/loans/BorrowerOnboarding/documents/resguardo';
+import {
+  DocumentFillData, fillContract, fillPagare, fillResguardo,
+} from '../pages/loans/BorrowerOnboarding/documents/fill';
 
 export interface ContractPdfParams {
   clientId: number;
@@ -15,16 +18,35 @@ export interface ContractPdfParams {
   confidenceScore: number;
   acceptedAtISO: string;
   signatureDataUrl: string;
+  /** Which side the signer is on — decides the documents and where their name goes. */
+  signerRole: KycSignerRole;
 }
 
-/** The three documents signed at the KYC Contrato step, in signing order. */
+/** The documents signed at the KYC Contrato step, in signing order. */
 export type KycDocumentId = 'contrato' | 'pagare' | 'resguardo';
+export type KycSignerRole = 'lender' | 'borrower';
 
 export const KYC_DOCUMENTS: ReadonlyArray<{ id: KycDocumentId; title: string; text: string }> = [
   { id: 'contrato', title: 'Contrato de Crédito', text: CONTRACT_TEXT },
   { id: 'pagare', title: 'Pagaré', text: PAGARE_TEXT },
   { id: 'resguardo', title: 'Constancia de Resguardo del Pagaré Físico', text: RESGUARDO_TEXT },
 ];
+
+/**
+ * Who signs what:
+ *   - Prestamista: one Contrato de Crédito, with GMO Prestamos.
+ *   - Prestatario: Contrato de Crédito, Pagaré and Constancia de Resguardo, with the Prestamista.
+ */
+export const kycDocumentsFor = (role: KycSignerRole) => (role === 'lender'
+  ? [{ id: 'contrato' as const, title: 'Contrato de Crédito con GMO Prestamos' }]
+  : KYC_DOCUMENTS.map(({ id, title }) => ({ id, title })));
+
+/** The document's text with its blanks filled for this signer (see documents/fill.ts). */
+export function kycDocumentText(id: KycDocumentId, data: DocumentFillData): string {
+  if (id === 'contrato') return fillContract(data);
+  if (id === 'pagare') return fillPagare(data);
+  return fillResguardo(data);
+}
 
 const FIELD_ROWS: Array<{ label: string; key: keyof ContractPdfParams }> = [
   { label: 'Nombre completo', key: 'nombre' },
@@ -143,7 +165,13 @@ function toBase64(doc: jsPDF): string {
 }
 
 function buildPdf(id: KycDocumentId, params: ContractPdfParams, acceptanceLine: string): string {
-  const { title, text } = KYC_DOCUMENTS.find(d => d.id === id)!;
+  const { title } = kycDocumentsFor(params.signerRole).find(d => d.id === id) ?? KYC_DOCUMENTS.find(d => d.id === id)!;
+  const text = kycDocumentText(id, {
+    nombre: params.nombre,
+    domicilio: params.domicilio,
+    signerRole: params.signerRole,
+    date: params.acceptedAtISO ? new Date(params.acceptedAtISO) : new Date(),
+  });
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const y = renderBody(doc, renderHeader(doc, title, params), text);
   renderSignatureAndFooter(doc, y, params, acceptanceLine);

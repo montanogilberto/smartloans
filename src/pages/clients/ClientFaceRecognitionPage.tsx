@@ -27,7 +27,7 @@ import {
   IonButtons,
   useIonAlert,
 } from '@ionic/react';
-import { checkmark, chevronForward, cameraOutline, refreshOutline, personOutline, idCardOutline, documentTextOutline, close } from 'ionicons/icons';
+import { checkmark, chevronForward, cameraOutline, refreshOutline, personOutline, idCardOutline, documentTextOutline, close, closeOutline } from 'ionicons/icons';
 import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
@@ -62,7 +62,8 @@ import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidenc
 import { ExtractedIdFields, extractIneFields } from '../../utils/idOcr';
 import { cropIneSignatureRegion } from '../../utils/signatureCrop';
 import {
-  KYC_DOCUMENTS, KycDocumentId, generateContractPdfBase64, generatePagarePdfBase64, generateResguardoPdfBase64,
+  KycDocumentId, KycSignerRole, kycDocumentsFor, kycDocumentText, generateContractPdfBase64, generatePagarePdfBase64,
+  generateResguardoPdfBase64,
 } from '../../utils/contractPdf';
 
 import './ClientFaceRecognitionPage.css';
@@ -108,7 +109,11 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const pops = usePopovers();
 
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const location = useLocation<{ clientId?: number; continueToPayments?: boolean; returnTo?: string } | undefined>();
+  // registerAs: which type the caller is registering (lender dashboard → 'lender',
+  // borrower dashboard → 'borrower'). It decides the documents and the payment step.
+  const location = useLocation<{
+    clientId?: number; continueToPayments?: boolean; returnTo?: string; registerAs?: KycSignerRole;
+  } | undefined>();
   const history = useHistory();
 
   // Deep-link from the client (or lender) dashboard's onboarding checklist —
@@ -285,9 +290,16 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // on file (SavedCardSetup) on the platform account. Both run on the single
   // POS GMO platform account; the one-time Connect platform-profile must be
   // configured in the Stripe Dashboard for the lender path to create accounts.
-  const isPayoutClient =
-    selectedClient?.clientType === 'lender' || selectedClient?.clientType === 'both';
+  // The type being registered: what the caller said, else inferred (staff picking a
+  // client from the list, old deep links) from the client type / active product.
+  const signerRole: KycSignerRole = location.state?.registerAs
+    ?? ((selectedClient?.clientType === 'lender' || selectedClient?.clientType === 'both'
+      || (!isStaff && actsAsLender(roleCode, activeProduct))) ? 'lender' : 'borrower');
+  const isPayoutClient = signerRole === 'lender';
+  const signerDocs = kycDocumentsFor(signerRole);
   const paymentStepLabel = isPayoutClient ? 'Cuenta de pago' : 'Tarjeta';
+  const signerName = extractedIdFields.nombre?.trim()
+    || (selectedClient ? `${selectedClient.first_name} ${selectedClient.last_name}`.trim() : '');
 
   // Verificación (2) only shows the biometric result; Datos (3) is the review
   // of what was read from the INE; Contrato (4) is reading + accepting the three
@@ -853,7 +865,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
 
       const pdfParams = {
         clientId: Number(selectedClient?.clientId),
-        nombre: idf.nombre,
+        // Same name the "Leer" preview showed: the INE's, else the client record's.
+        nombre: idf.nombre || signerName,
         domicilio: idf.domicilio,
         curp: idf.curp,
         claveElector: idf.claveElector,
@@ -863,6 +876,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
         confidenceScore,
         acceptedAtISO: now,
         signatureDataUrl: contractSignatureBase64,
+        signerRole,
       };
 
       const payload: ContractSubmissionRequest = {
@@ -886,10 +900,14 @@ const ClientFaceRecognitionPage: React.FC = () => {
         contractAccepted: true,
         contractPdfBase64: generateContractPdfBase64(pdfParams),
         contractAcceptedAt: now,
-        pagareAccepted: true,
-        pagarePdfBase64: generatePagarePdfBase64({ ...pdfParams, hasPhysicalPagare }),
-        hasPhysicalPagare,
-        resguardoPdfBase64: generateResguardoPdfBase64({ ...pdfParams, hasPhysicalPagare }),
+        // A lender signs only the contract with GMO Prestamos; the pagaré and its
+        // constancia are the borrower's, in favor of their lender.
+        pagareAccepted: signerRole === 'borrower',
+        pagarePdfBase64: signerRole === 'borrower' ? generatePagarePdfBase64({ ...pdfParams, hasPhysicalPagare }) : '',
+        hasPhysicalPagare: signerRole === 'borrower' && hasPhysicalPagare,
+        resguardoPdfBase64: signerRole === 'borrower'
+          ? generateResguardoPdfBase64({ ...pdfParams, hasPhysicalPagare })
+          : undefined,
         idSignatureCropBase64: idSignatureCropBase64 ? idSignatureCropBase64.split(',')[1] : undefined,
         contractSignatureBase64: contractSignatureBase64.split(',')[1],
         userId: 0,
@@ -940,7 +958,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
         } else {
           presentAlert({
             header: 'Documentos firmados',
-            message: 'Tu contrato, pagaré y constancia se guardaron. También los encuentras en tu expediente digital.',
+            message: signerRole === 'lender'
+              ? 'Tu contrato con GMO Prestamos se guardó. También lo encuentras en tu expediente digital.'
+              : 'Tu contrato, pagaré y constancia se guardaron. También los encuentras en tu expediente digital.',
             backdropDismiss: false,
             buttons: [
               ...saved.map(d => ({
@@ -961,6 +981,18 @@ const ClientFaceRecognitionPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+
+  // ✕ in the wizard: leave without finishing, after a confirm (an accidental tap
+  // must not throw away the photos just taken). Goes where "done" would go.
+  const confirmExit = () => presentAlert({
+    header: '¿Salir de la verificación?',
+    message: 'Podrás continuar después desde tu panel. Lo que no hayas guardado se tendrá que capturar de nuevo.',
+    buttons: [
+      { text: 'Seguir aquí', role: 'cancel' },
+      { text: 'Salir', role: 'destructive', handler: () => { history.push(returnTo); } },
+    ],
+  });
 
   const StepBar = () => (
     <div className="wizard-step-indicator">
@@ -1159,13 +1191,13 @@ const ClientFaceRecognitionPage: React.FC = () => {
         )}
         {step === 4 && (
           // Terms accepted here; signing happens on the next step (Firma).
-          <button className="wizard-footer-next" onClick={() => setStep(5)} disabled={!contractAccepted || !pagareAccepted}>
+          <button className="wizard-footer-next" onClick={() => setStep(5)} disabled={!contractAccepted || (signerRole === 'borrower' && !pagareAccepted)}>
             Continuar <IonIcon icon={chevronForward} />
           </button>
         )}
         {step === 5 && (
           // Firma — the actual submission, now that the signature exists.
-          <button className="wizard-footer-submit" onClick={handleSubmitContract} disabled={!contractAccepted || !pagareAccepted || !contractSignatureBase64 || loading}>
+          <button className="wizard-footer-submit" onClick={handleSubmitContract} disabled={!contractAccepted || (signerRole === 'borrower' && !pagareAccepted) || !contractSignatureBase64 || loading}>
             Enviar contrato
           </button>
         )}
@@ -1564,7 +1596,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
 
           <IonList lines="none" className="ion-margin-top">
             <IonListHeader>Lee los documentos antes de aceptarlos</IonListHeader>
-            {KYC_DOCUMENTS.map(d => (
+            {signerDocs.map(d => (
               <IonItem key={d.id} button detail onClick={() => setReadingDoc(d.id)}>
                 <IonIcon icon={documentTextOutline} slot="start" />
                 <IonLabel>{d.title}</IonLabel>
@@ -1575,7 +1607,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
           <IonModal isOpen={!!readingDoc} onDidDismiss={() => setReadingDoc(null)}>
             <IonHeader>
               <IonToolbar>
-                <IonTitle>{KYC_DOCUMENTS.find(d => d.id === readingDoc)?.title}</IonTitle>
+                <IonTitle>{signerDocs.find(d => d.id === readingDoc)?.title}</IonTitle>
                 <IonButtons slot="end">
                   <IonButton onClick={() => setReadingDoc(null)} aria-label="Cerrar">
                     <IonIcon icon={close} slot="icon-only" />
@@ -1585,7 +1617,12 @@ const ClientFaceRecognitionPage: React.FC = () => {
             </IonHeader>
             <IonContent className="ion-padding">
               <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-                {KYC_DOCUMENTS.find(d => d.id === readingDoc)?.text}
+                {readingDoc && kycDocumentText(readingDoc, {
+                  nombre: signerName,
+                  domicilio: extractedIdFields.domicilio ?? '',
+                  signerRole,
+                  date: new Date(),
+                })}
               </p>
             </IonContent>
           </IonModal>
@@ -1598,6 +1635,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
             />
           </IonItem>
 
+          {signerRole === 'borrower' && (<>
           <IonItem>
             <IonLabel>Acepto y firmo electrónicamente el pagaré</IonLabel>
             <IonCheckbox
@@ -1613,6 +1651,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
               onIonChange={(e: CustomEvent<{ checked: boolean }>) => setHasPhysicalPagare(e.detail.checked)}
             />
           </IonItem>
+          </>)}
 
         </IonCardContent>
       </IonCard>
@@ -1628,7 +1667,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
           <IonCardTitle>Paso 6: Firma</IonCardTitle>
         </IonCardHeader>
         <IonCardContent>
-          <p>Firma para validar tu identidad y enviar el contrato y el pagaré.</p>
+          <p>{signerRole === 'lender'
+            ? 'Firma para validar tu identidad y enviar tu contrato con GMO Prestamos.'
+            : 'Firma para validar tu identidad y enviar el contrato, el pagaré y la constancia.'}</p>
           <div className="ion-margin-top">
             <SignaturePad
               label="Firma aquí para validar tu identidad"
@@ -1748,7 +1789,24 @@ const ClientFaceRecognitionPage: React.FC = () => {
       />
 
       <IonContent fullscreen className="ion-padding client-face-recognition-page">
+        <div className="cfr-topbar">
+          <IonButton
+            fill="clear"
+            className="cfr-close"
+            aria-label="Cerrar verificación"
+            disabled={loading}
+            onClick={confirmExit}
+          >
+            <IonIcon icon={closeOutline} slot="icon-only" />
+          </IonButton>
+        </div>
         <StepBar />
+        <div className={`kyc-register-as kyc-register-as--${signerRole}`} role="status">
+          Registro como <strong>{signerRole === 'lender' ? 'Prestamista' : 'Prestatario'}</strong>
+          <span>{signerRole === 'lender'
+            ? 'Firmarás tu contrato de crédito con GMO Prestamos.'
+            : 'Firmarás contrato de crédito, pagaré y constancia de resguardo con tu prestamista.'}</span>
+        </div>
         {renderStepContent()}
       </IonContent>
 

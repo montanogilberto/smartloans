@@ -76,6 +76,7 @@ export function useLenderDashboard() {
       clientId: lenderClientId,
       continueToPayments: true,
       returnTo: `/lender-dashboard/${lenderClientId}`,
+      registerAs: 'lender',
     });
   };
 
@@ -93,8 +94,8 @@ export function useLenderDashboard() {
       { label: 'Prueba de vida (selfie)', done: !!f?.clientSelfieBlobUrl },
       { label: 'Comprobante de presencia', done: !!f?.presenceVideoBlobUrl },
       { label: 'Verificación biométrica', done: biometricDone, review: biometricReview },
+      // A lender signs only the contract with GMO Prestamos (no pagaré).
       { label: 'Contrato firmado', done: !!f?.contractAccepted },
-      { label: 'Pagaré aceptado', done: !!f?.pagareAccepted },
     ];
   }, [faceRecord]);
   const verificationDone = verificationSteps.filter(s => s.done).length;
@@ -290,7 +291,7 @@ export function useLenderDashboard() {
   //    account can arrive with isVerified=1 (D18), so isDefault is required too;
   // 3) capital published in the marketplace (or already lent: a funded offer
   //    stops counting as published, the loan shows it was done).
-  const identityVerified = !!(faceRecord?.isVerified && faceRecord?.contractAccepted && faceRecord?.pagareAccepted);
+  const identityVerified = !!(faceRecord?.isVerified && faceRecord?.contractAccepted);
   const primaryBankAccount = bankAccounts.find(a => a.isVerified && a.isDefault && a.accountStatus !== 'ARCHIVED') ?? null;
   const setupSteps = [
     {

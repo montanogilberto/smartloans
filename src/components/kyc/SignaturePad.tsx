@@ -15,20 +15,13 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onSave, onClear, height = 2
 
   const getCtx = () => canvasRef.current?.getContext('2d');
 
+  // Returns CSS-pixel coordinates. The context is already scaled by
+  // devicePixelRatio (see setupCanvas), so we must NOT scale again here —
+  // doing so drew strokes dpr× away from the finger on high-density phones.
   const getPos = (e: MouseEvent | TouchEvent, canvas: HTMLCanvasElement) => {
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    if ('touches' in e) {
-      return {
-        x: (e.touches[0].clientX - rect.left) * scaleX,
-        y: (e.touches[0].clientY - rect.top) * scaleY,
-      };
-    }
-    return {
-      x: ((e as MouseEvent).clientX - rect.left) * scaleX,
-      y: ((e as MouseEvent).clientY - rect.top) * scaleY,
-    };
+    const point = 'touches' in e ? (e.touches[0] ?? e.changedTouches[0]) : (e as MouseEvent);
+    return { x: point.clientX - rect.left, y: point.clientY - rect.top };
   };
 
   const startDraw = useCallback((e: MouseEvent | TouchEvent) => {
@@ -54,27 +47,45 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onSave, onClear, height = 2
     ctx.stroke();
   }, []);
 
+  // Keep the latest onSave without re-binding the canvas listeners.
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
+
   const stopDraw = useCallback(() => {
+    if (!drawing.current) return;
     drawing.current = false;
+    // Auto-save after each stroke so "Enviar contrato" works even if the user
+    // never taps "Guardar firma".
+    if (hasStrokes.current && canvasRef.current) {
+      onSaveRef.current(canvasRef.current.toDataURL('image/png'));
+    }
   }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Retina resolution
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = height * dpr;
-    ctx.scale(dpr, dpr);
-
-    ctx.strokeStyle = '#1e3a5f';
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    // Size the backing store to the rendered size × dpr. Re-run when the
+    // canvas is resized (e.g. it mounted at width 0 during a step transition),
+    // but only while empty — resizing a canvas wipes it.
+    let lastWidth = -1;
+    const setupCanvas = () => {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const width = canvas.getBoundingClientRect().width;
+      if (width === lastWidth || (hasStrokes.current && lastWidth > 0)) return;
+      lastWidth = width;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.strokeStyle = '#1e3a5f';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+    };
+    setupCanvas();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(setupCanvas) : null;
+    ro?.observe(canvas);
 
     canvas.addEventListener('mousedown', startDraw);
     canvas.addEventListener('mousemove', draw);
@@ -83,8 +94,11 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onSave, onClear, height = 2
     canvas.addEventListener('touchstart', startDraw, { passive: false });
     canvas.addEventListener('touchmove', draw, { passive: false });
     canvas.addEventListener('touchend', stopDraw);
+    canvas.addEventListener('touchcancel', stopDraw);
 
     return () => {
+      ro?.disconnect();
+      canvas.removeEventListener('touchcancel', stopDraw);
       canvas.removeEventListener('mousedown', startDraw);
       canvas.removeEventListener('mousemove', draw);
       canvas.removeEventListener('mouseup', stopDraw);
@@ -99,7 +113,10 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onSave, onClear, height = 2
     const canvas = canvasRef.current;
     const ctx = getCtx();
     if (!canvas || !ctx) return;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
     hasStrokes.current = false;
     onClear?.();
   };

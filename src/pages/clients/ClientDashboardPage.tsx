@@ -523,7 +523,7 @@ const ClientDashboardPage: React.FC = () => {
     setWizardStarting(true);
     try {
       await ensureQrGenerated();
-      history.push('/clientFaceRecognitions', { clientId, continueToPayments: true });
+      history.push('/clientFaceRecognitions', { clientId, continueToPayments: true, registerAs: 'borrower' });
     } finally {
       setWizardStarting(false);
     }

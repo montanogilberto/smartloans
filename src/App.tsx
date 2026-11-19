@@ -23,6 +23,7 @@ import ClientDashboardPage from './pages/clients/ClientDashboardPage';
 import BorrowerOnboardingPage from './pages/loans/BorrowerOnboardingPage';
 import LoanPaymentPage from './pages/loans/LoanPaymentPage';
 import { useUser } from './contexts/UserContext';
+import { actsAsLender } from './utils/productContext';
 import LoanChatListPage from './pages/loans/LoanChatListPage';
 import ExpedienteDigitalPage from './pages/clients/ExpedienteDigitalPage';
 import PageLoading from './components/ui/PageLoading';
@@ -72,10 +73,12 @@ const ToInicio: React.FC = () => {
 // client, the same state the dashboards pass, instead of editing the copied callers.
 const ToIdentityVerification: React.FC = () => {
   const history = useHistory();
-  const { clientId } = useUser();
+  const { clientId, roleCode, activeProduct } = useUser();
   useEffect(() => {
-    history.replace('/clientFaceRecognitions', { clientId, continueToPayments: true });
-  }, [history, clientId]);
+    // Registering as the product the session is in (lender vs borrower documents).
+    const registerAs = actsAsLender(roleCode, activeProduct) ? 'lender' : 'borrower';
+    history.replace('/clientFaceRecognitions', { clientId, continueToPayments: true, registerAs });
+  }, [history, clientId, roleCode, activeProduct]);
   return null;
 };
 
