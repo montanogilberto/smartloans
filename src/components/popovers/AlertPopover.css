@@ -1,0 +1,4 @@
+.alert-popover {
+  --width: 320px;
+  --max-width: calc(100vw - 32px);
+}

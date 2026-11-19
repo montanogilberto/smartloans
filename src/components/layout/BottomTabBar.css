@@ -1,0 +1,36 @@
+/* The .cd-tabbar / .cd-tab look lives in theme/variables.css (shared with POS).
+   These rules only reset IonButton so it matches POS's plain <button> tabs. */
+.cd-tabbar ion-button.cd-tab {
+  --background: transparent;
+  --background-hover: transparent;
+  --background-activated: transparent;
+  --box-shadow: none;
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 6px;
+  --padding-bottom: 6px;
+  --color: var(--text-secondary, #666);
+  margin: 0;
+  height: auto;
+  min-height: 52px;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+}
+
+.cd-tabbar ion-button.cd-tab--active {
+  --color: var(--dashboard-blue, #007bff);
+}
+
+.cd-tab-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.72rem;
+  line-height: 1.1;
+}
+
+.cd-tab-inner ion-icon {
+  font-size: 1.5rem;
+}

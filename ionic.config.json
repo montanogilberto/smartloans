@@ -1,0 +1,7 @@
+{
+  "name": "smartloans",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "react-vite"
+}

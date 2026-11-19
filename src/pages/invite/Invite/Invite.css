@@ -1,0 +1,70 @@
+.invite-hero {
+  text-align: center;
+  padding: 16px 8px 8px;
+}
+
+.invite-hero-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(5, 150, 105, 0.12);
+  color: #059669;
+  font-size: 32px;
+}
+
+.invite-hero h1 {
+  margin: 12px 0 6px;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.invite-hero p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ion-color-medium);
+}
+
+.invite-card {
+  margin: 16px 0;
+  border-radius: 14px;
+}
+
+.invite-preview-label {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ion-color-medium);
+}
+
+.invite-preview {
+  margin: 0;
+  font-size: 14px;
+  white-space: pre-line;
+  word-break: break-word;
+  color: var(--ion-text-color, #111827);
+}
+
+.invite-share-btn {
+  --background: #059669;
+  --background-activated: #047857;
+  margin-top: 8px;
+}
+
+.invite-copy-btn {
+  --color: #059669;
+  --border-color: #059669;
+  margin-top: 8px;
+}
+
+/* Off-screen buffer for the web copy fallback (InviteLogic copyText). */
+.invite-copy-buffer {
+  position: fixed;
+  top: -1000px;
+  left: 0;
+  opacity: 0;
+}
