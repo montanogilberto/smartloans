@@ -76,20 +76,13 @@ const DEFAULT_AUTH: AuthData = {
 };
 
 // ── App company ────────────────────────────────────────────────────────────
-/** SmartLoans sessions always run as company 1008 (config/appCompany.ts). A
- * session saved under another company (an older build, a legacy company-1
- * account) drops that company's name and cached capabilities so both reload. */
-const pinToAppCompany = (data: AuthData): AuthData => {
-  if (!data.isAuthenticated || data.companyId === SMARTLOANS_COMPANY_ID) return data;
-  console.log('[UserContext] pinning session company', data.companyId, '→', SMARTLOANS_COMPANY_ID);
-  return {
-    ...data,
-    companyId: SMARTLOANS_COMPANY_ID,
-    companyName: '',
-    clientCapabilities: [],
-    clientCapabilitiesKey: undefined,
-  };
-};
+/** A session with no company runs as SmartLoans (1008, config/appCompany.ts).
+ * Only a DEFAULT: an account whose client row lives in another company keeps
+ * that company — clients.companyId is fixed per row and sp_clientCapabilities
+ * (grants, reads) rejects a clientId sent with any other company
+ * ("clientId no pertenece a companyId"). */
+const withAppCompanyDefault = (data: AuthData): AuthData =>
+  data.isAuthenticated && !data.companyId ? { ...data, companyId: SMARTLOANS_COMPANY_ID } : data;
 
 // ── localStorage helpers ───────────────────────────────────────────────────
 const loadStoredAuth = (): AuthData => {
@@ -99,7 +92,7 @@ const loadStoredAuth = (): AuthData => {
     console.log("[UserContext] loadStoredAuth: raw =", raw);
     if (!raw) return DEFAULT_AUTH;
     const parsed = JSON.parse(raw) as Partial<AuthData>;
-    const result = pinToAppCompany({
+    const result = withAppCompanyDefault({
       ...DEFAULT_AUTH,
       ...parsed,
       roleCode: normalizeRoleCode(parsed.roleCode),
@@ -217,7 +210,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   /** Full login — merges data and marks session as authenticated */
   const login = (data: Partial<AuthData>) => {
     console.log("🟢 UserContext LOGIN SUCCESS:", { ...auth, ...data, isAuthenticated: true });
-    const next: AuthData = pinToAppCompany({
+    const next: AuthData = withAppCompanyDefault({
       ...auth,
       ...data,
       roleCode: normalizeRoleCode(data.roleCode ?? auth.roleCode),

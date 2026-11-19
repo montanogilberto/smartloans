@@ -5,7 +5,7 @@
 // checks whether the uploaded photo actually matches what was declared
 // (amount/date/bank/beneficiary), so a mismatched or unreadable receipt can
 // be routed to manual review instead of silently trusted.
-const AGENT_BASE = 'https://loanagents-smartloans.azurewebsites.net';
+export const AGENT_BASE = 'https://loanagents-smartloans.azurewebsites.net';
 
 export interface ValidateTransferEvidenceRequest {
   evidenceUrl: string;

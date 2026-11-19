@@ -11,10 +11,10 @@ export interface EnrollOption {
   next: string;
 }
 
-export const ENROLL_TITLE = 'Activa SmartLoans';
+export const ENROLL_TITLE = 'Activa GMO Prestamos';
 
 // SmartLoans is its own app: no mention of POS purchases or rewards here.
-export const ENROLL_INTRO = 'Elige cómo quieres usar SmartLoans.';
+export const ENROLL_INTRO = 'Elige cómo quieres usar GMO Prestamos.';
 
 export const ENROLL_OPTIONS: EnrollOption[] = [
   {

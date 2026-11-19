@@ -9,6 +9,8 @@ PODS:
     - Capacitor
   - CapacitorCamera (7.0.5):
     - Capacitor
+  - CapacitorClipboard (7.0.4):
+    - Capacitor
   - CapacitorCommunitySpeechRecognition (7.0.1):
     - Capacitor
   - CapacitorCommunityTextToSpeech (6.1.0):
@@ -27,6 +29,8 @@ PODS:
     - Capacitor
   - CapacitorPushNotifications (7.0.7):
     - Capacitor
+  - CapacitorShare (7.0.4):
+    - Capacitor
   - CapacitorStatusBar (7.0.1):
     - Capacitor
   - IONGeolocationLib (1.0.1)
@@ -37,6 +41,7 @@ DEPENDENCIES:
   - "CapacitorApp (from `../../node_modules/@capacitor/app`)"
   - "CapacitorBrowser (from `../../node_modules/@capacitor/browser`)"
   - "CapacitorCamera (from `../../node_modules/@capacitor/camera`)"
+  - "CapacitorClipboard (from `../../node_modules/@capacitor/clipboard`)"
   - "CapacitorCommunitySpeechRecognition (from `../../node_modules/@capacitor-community/speech-recognition`)"
   - "CapacitorCommunityTextToSpeech (from `../../node_modules/@capacitor-community/text-to-speech`)"
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
@@ -46,6 +51,7 @@ DEPENDENCIES:
   - "CapacitorLocalNotifications (from `../../node_modules/@capacitor/local-notifications`)"
   - "CapacitorPreferences (from `../../node_modules/@capacitor/preferences`)"
   - "CapacitorPushNotifications (from `../../node_modules/@capacitor/push-notifications`)"
+  - "CapacitorShare (from `../../node_modules/@capacitor/share`)"
   - "CapacitorStatusBar (from `../../node_modules/@capacitor/status-bar`)"
 
 SPEC REPOS:
@@ -63,6 +69,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/browser"
   CapacitorCamera:
     :path: "../../node_modules/@capacitor/camera"
+  CapacitorClipboard:
+    :path: "../../node_modules/@capacitor/clipboard"
   CapacitorCommunitySpeechRecognition:
     :path: "../../node_modules/@capacitor-community/speech-recognition"
   CapacitorCommunityTextToSpeech:
@@ -81,6 +89,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/preferences"
   CapacitorPushNotifications:
     :path: "../../node_modules/@capacitor/push-notifications"
+  CapacitorShare:
+    :path: "../../node_modules/@capacitor/share"
   CapacitorStatusBar:
     :path: "../../node_modules/@capacitor/status-bar"
 
@@ -90,6 +100,7 @@ SPEC CHECKSUMS:
   CapacitorApp: 6b89831465d6bc99bc89779b1b7f5327e33011ce
   CapacitorBrowser: 3bcddd9dd07cfff9105dcc88ad64853be9862e50
   CapacitorCamera: fdbf24f93bc44ca13c4209866368a1972349d3d2
+  CapacitorClipboard: 9779d5e2f766d501d8c90e0f0f689abd293efc2f
   CapacitorCommunitySpeechRecognition: b133f6f6ba84316639fc2fd1760a6d7ab99fb23b
   CapacitorCommunityTextToSpeech: f024b1587fd68b74180c8b132d603b44be81cda3
   CapacitorCordova: 31bbe4466000c6b86d9b7f1181ee286cff0205aa
@@ -99,9 +110,10 @@ SPEC CHECKSUMS:
   CapacitorLocalNotifications: f8ccb7e9c9056a23f415398e51825594e953af3a
   CapacitorPreferences: d82a7e3b95fcab43a553268b803356522910d153
   CapacitorPushNotifications: f7e0909b16354405bbf4fd50b1ae5111843220ab
+  CapacitorShare: 14b5d7f0a2c6de86dcad8995da80fb707ee32f62
   CapacitorStatusBar: 275cbf2f4dfc00388f519ef80c7ec22edda342c9
   IONGeolocationLib: 20f9d0248a0b5264511fb57a37e25dd2badf797a
 
-PODFILE CHECKSUM: 220289888e2e8a59871600fc4835661fc6681e1f
+PODFILE CHECKSUM: 58ee38ac2182f3b795da343c8a6db765d5ff8125
 
 COCOAPODS: 1.15.2

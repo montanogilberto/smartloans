@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { smartLoansLanding } from './smartLoansLanding';
+import { smartLoansLanding, smartLoansProductFor } from './smartLoansLanding';
 
 describe('smartLoansLanding', () => {
   it('uses the active product when it is a SmartLoans one', () => {
@@ -20,5 +20,17 @@ describe('smartLoansLanding', () => {
 
   it('returns null without a client record', () => {
     expect(smartLoansLanding(['borrower'], 'borrower', 0)).toBeNull();
+  });
+});
+
+describe('smartLoansProductFor', () => {
+  it('keeps an active SmartLoans product', () => {
+    expect(smartLoansProductFor(['pos', 'lender', 'borrower'], 'borrower')).toBe('borrower');
+  });
+  it('switches a POS session to the first SmartLoans product held', () => {
+    expect(smartLoansProductFor(['pos', 'lender'], 'pos')).toBe('lender');
+  });
+  it('returns null when the account holds none', () => {
+    expect(smartLoansProductFor(['pos'], 'pos')).toBeNull();
   });
 });

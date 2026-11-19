@@ -11,7 +11,8 @@ import {
 import { useClientPhoneLogin } from './components/ClientPhoneLoginLogic';
 
 /** After any sign-in the session goes to /inicio, which picks the SmartLoans dashboard. */
-export const POST_LOGIN_ROUTE = '/inicio';
+export { POST_LOGIN_ROUTE } from './LoginConstants';
+import { POST_LOGIN_ROUTE } from './LoginConstants';
 
 /** 'phone' (SMS → PIN → biometric) is the main path; 'password' is for accounts with a username. */
 export type LoginMode = 'phone' | 'password';

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonTitle, IonBadge, IonMenuButton } from '@ionic/react';
 import ConfirmBackButton from '../ui/ConfirmBackButton';
 import TokenBalanceChip from './TokenBalanceChip';
-import { helpCircleOutline, notificationsOutline, mailOutline, cartOutline, chatbubblesOutline, sparklesOutline } from 'ionicons/icons';
+import { alertCircleOutline, helpCircleOutline, notificationsOutline, mailOutline, cartOutline, chatbubblesOutline, sparklesOutline } from 'ionicons/icons';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { useHistory } from 'react-router-dom';
@@ -27,6 +27,9 @@ interface HeaderProps {
   // /loan-chat. Only rendered for POS roles (mirrors the SmartLoans button's
   // own role gating) — pass this from Incomes/Expenses/Accounting pages only.
   posSupportTopic?: PosSupportTopic;
+  /** Pending alerts for the Alertas popover (e.g. a new lender's setup steps):
+   * > 0 turns the help icon into an alert icon with this count as a badge. */
+  alertCount?: number;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -37,6 +40,7 @@ const Header: React.FC<HeaderProps> = ({
   backButtonText = 'Atrás',
   backButtonHref = '/',
   posSupportTopic,
+  alertCount = 0,
 }) => {
   const history = useHistory();
   const { cart } = useCart();
@@ -130,7 +134,7 @@ const Header: React.FC<HeaderProps> = ({
           {isSmartLoansRole && agentClientId > 0 && (
             <IonButton
               onClick={() => { console.log('[Header] agent icon → /loan-chat/new?lenderId=' + agentClientId); history.push(`/loan-chat/new?lenderId=${agentClientId}`); }}
-              title="Asistente SmartLoans"
+              title="Asistente GMO Prestamos"
               className="header-action-button"
               style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}
             >
@@ -170,8 +174,11 @@ const Header: React.FC<HeaderProps> = ({
           <IonButton onClick={presentMailPopover} title="Messages" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>
             <IonIcon icon={mailOutline} style={{ fontSize: '28px' }} />
           </IonButton>
-          <IonButton onClick={presentAlertPopover} title="Help" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>
-            <IonIcon icon={helpCircleOutline} style={{ fontSize: '28px' }} />
+          <IonButton onClick={presentAlertPopover} title={alertCount > 0 ? 'Alertas' : 'Help'} aria-label={alertCount > 0 ? `${alertCount} alertas pendientes` : 'Ayuda'} className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>
+            <span className="icon-with-badge">
+              <IonIcon icon={alertCount > 0 ? alertCircleOutline : helpCircleOutline} style={{ fontSize: '28px' }} />
+              {alertCount > 0 && <IonBadge className="badge-side" color="warning">{alertCount}</IonBadge>}
+            </span>
           </IonButton>
 
         </IonButtons>

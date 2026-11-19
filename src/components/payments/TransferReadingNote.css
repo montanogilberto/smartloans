@@ -1,0 +1,70 @@
+.trn {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.trn > ion-icon {
+  flex-shrink: 0;
+  font-size: 20px;
+  margin-top: 1px;
+}
+
+.trn--busy {
+  align-items: center;
+  background: rgba(37, 99, 235, 0.08);
+  color: #1e40af;
+}
+
+.trn--ok {
+  background: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+}
+
+.trn--warn {
+  background: rgba(217, 119, 6, 0.12);
+  color: #92400e;
+}
+
+.trn-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.trn-body strong {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.trn-body dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 6px 0 0;
+}
+
+.trn-body dt {
+  opacity: 0.75;
+}
+
+.trn-body dd {
+  margin: 0;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.trn-alert {
+  margin: 6px 0 0;
+  font-weight: 600;
+}
+
+.trn-hint {
+  margin: 6px 0 0;
+  opacity: 0.8;
+}

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">SmartLoans</string>
-    <string name="title_activity_main">SmartLoans</string>
-    <string name="package_name">com.factoryAI.smartloans</string>
-    <string name="custom_url_scheme">com.factoryAI.smartloans</string>
+    <string name="app_name">GMO Prestamos</string>
+    <string name="title_activity_main">GMO Prestamos</string>
+    <string name="package_name">com.factoryAI.gmoprestamos</string>
+    <string name="custom_url_scheme">com.factoryAI.gmoprestamos</string>
 </resources>

@@ -4,7 +4,7 @@ import {
   IonMenu, IonMenuToggle, IonTitle, IonToolbar, useIonAlert,
 } from '@ionic/react';
 import {
-  addCircleOutline, briefcaseOutline, cashOutline, checkmarkCircle, logOutOutline, notificationsOutline, personCircleOutline, walletOutline,
+  addCircleOutline, briefcaseOutline, cashOutline, checkmarkCircle, chatbubblesOutline, logOutOutline, notificationsOutline, personCircleOutline, sparklesOutline, walletOutline,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
@@ -12,6 +12,7 @@ import { PRODUCT_LABELS, ProductContext, productLandingRoute } from '../../utils
 import { SMARTLOANS_PRODUCTS, isSmartLoansProduct } from '../../utils/smartLoansLanding';
 import { DEFAULT_AVATAR_URL } from '../../utils/formatters';
 import { fetchMyNotifications } from '../../api/myNotificationsApi';
+import { getChatConfig } from '../../api/loanChatApi';
 import { onDataChanged } from '../../utils/refreshBus';
 import './SideMenu.css';
 
@@ -41,6 +42,15 @@ const SideMenu: React.FC = () => {
     fetchMyNotifications(userId).then(r => setUnread(r.unreadCount)).catch(() => {});
   }, [isAuthenticated, userId]);
   useEffect(() => { loadUnread(); return onDataChanged(loadUnread); }, [loadUnread]);
+
+  // Customer-facing agent: the GMO Prestamos assistant (same chat the Header's ✨
+  // opens). 0 = assistant not configured → the entry is hidden. Staff agent tools
+  // (Agente WhatsApp, Agentes IA) stay in POS (migration decision D2).
+  const [agentClientId, setAgentClientId] = useState(0);
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    getChatConfig().then(c => setAgentClientId(c.agentEnabled ? c.agentClientId : 0)).catch(() => {});
+  }, [isAuthenticated]);
   const [presentAlert] = useIonAlert();
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
 
@@ -76,7 +86,7 @@ const SideMenu: React.FC = () => {
     <IonMenu menuId="main-menu" contentId="main" side="start" disabled={!isAuthenticated} onIonWillOpen={loadUnread}>
       <IonHeader className="menu-header">
         <IonToolbar>
-          <IonTitle>SmartLoans</IonTitle>
+          <IonTitle>GMO Prestamos</IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -92,7 +102,7 @@ const SideMenu: React.FC = () => {
           <div className="profile-info">
             <h3 className="profile-name">{username || 'Usuario'}</h3>
             <p className="profile-role">
-              {activeProduct && isSmartLoansProduct(activeProduct) ? PRODUCT_LABELS[activeProduct] : 'SmartLoans'}
+              {activeProduct && isSmartLoansProduct(activeProduct) ? PRODUCT_LABELS[activeProduct] : 'GMO Prestamos'}
             </p>
           </div>
         </div>
@@ -121,6 +131,22 @@ const SideMenu: React.FC = () => {
               </IonItem>
             </IonMenuToggle>
           )}
+
+          <IonListHeader className="side-menu-section">Agentes</IonListHeader>
+          {agentClientId > 0 && (
+            <IonMenuToggle autoHide={false}>
+              <IonItem button detail={false} routerLink={`/loan-chat/new?lenderId=${agentClientId}`}>
+                <IonIcon icon={sparklesOutline} slot="start" />
+                <IonLabel>Asistente GMO Prestamos</IonLabel>
+              </IonItem>
+            </IonMenuToggle>
+          )}
+          <IonMenuToggle autoHide={false}>
+            <IonItem button detail={false} routerLink="/loan-chats">
+              <IonIcon icon={chatbubblesOutline} slot="start" />
+              <IonLabel>Mis conversaciones</IonLabel>
+            </IonItem>
+          </IonMenuToggle>
 
           <IonListHeader className="side-menu-section">Mensajes</IonListHeader>
           <IonMenuToggle autoHide={false}>

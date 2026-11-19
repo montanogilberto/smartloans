@@ -86,7 +86,7 @@ const LoginView: React.FC = () => {
                 <div className="login-logo login-logo--mark">
                   <IonIcon src={SMARTLOANS_MARK_SRC} aria-hidden="true" />
                 </div>
-                <h1 className="login-title">SmartLoans</h1>
+                <h1 className="login-title">GMO Prestamos</h1>
                 <p className="login-subtitle">Préstamos entre personas</p>
               </div>
 

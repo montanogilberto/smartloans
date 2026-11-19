@@ -7,7 +7,8 @@ import {
   CodeRequestChannel, LEGACY_CODE_LENGTH,
 } from '../../../../api/clientLoginApi';
 import { normalizeRoleCode } from '../../../../config/rolePermissions';
-import { appDestination, LoginApp } from '../../../../utils/loginApps';
+import { LoginApp } from '../../../../utils/loginApps';
+import { POST_LOGIN_ROUTE } from '../LoginConstants';
 import { DEFAULT_AVATAR_URL } from '../../../../utils/formatters';
 import {
   isBiometricAvailable, isBiometricLockEnabled, setBiometricLockEnabled, authenticateBiometric,
@@ -188,7 +189,7 @@ export const useClientPhoneLogin = (app: LoginApp) => {
       roleCode: pending.roleCode,
       roleName: pending.roleName,
     });
-    history.push(appDestination(app, pending.roleCode, pending.clientId).route);
+    history.push(POST_LOGIN_ROUTE);
   };
 
   // Biometric is offered once per device: skip straight in if the hardware

@@ -18,7 +18,7 @@ const PendingModuleView: React.FC<{ title: string }> = ({ title }) => {
       <IonContent className="ion-padding">
         <div className="session-center">
           <h2>Hola{vm.username ? `, ${vm.username}` : ''}</h2>
-          <p>Este módulo se está migrando a la nueva app de SmartLoans.</p>
+          <p>Este módulo se está migrando a la nueva app de GMO Prestamos.</p>
         </div>
       </IonContent>
     </IonPage>

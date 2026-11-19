@@ -33,7 +33,7 @@ export function useEnrollment() {
 
   // Enrolling is a self-service action on the client's own record; staff act for a company.
   const blockedReason =
-    isStaffRole(roleCode) ? 'Las cuentas de personal no se inscriben a SmartLoans desde aquí.'
+    isStaffRole(roleCode) ? 'Las cuentas de personal no se inscriben a GMO Prestamos desde aquí.'
       : !clientId || !companyId ? 'Tu cuenta no tiene un registro de cliente todavía. Pide ayuda en sucursal.'
       : null;
 

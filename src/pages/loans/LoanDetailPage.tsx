@@ -35,6 +35,8 @@ import {
 } from '../../api/transferEvidenceAgentApi';
 import { createPushNotification } from '../../api/pushNotificationsApi';
 import { pickEvidencePhoto } from '../../utils/pickAvatarPhoto';
+import { useTransferReading } from '../../hooks/useTransferReading';
+import TransferReadingNote from '../../components/payments/TransferReadingNote';
 import { listContractsForClient } from '../../api/digitalContractsApi';
 import { notifyDataChanged, onDataChanged } from '../../utils/refreshBus';
 import { actsAsBorrower } from '../../utils/productContext';
@@ -83,6 +85,8 @@ const LoanDetailPage: React.FC = () => {
     bankFrom: string; beneficiary: string; confidence: number; assessment: string;
   } | null>(null);
   const { showToast, toastProps } = useToast({ duration: 3500 });
+  // Agent reading of the attached comprobante: fills clave/banco when empty.
+  const receipt = useTransferReading();
 
   const load = useCallback(async () => {
     if (!companyId || !loanId) return;
@@ -230,7 +234,13 @@ const LoanDetailPage: React.FC = () => {
 
   const handlePickEvidence = async () => {
     const dataUrl = await pickEvidencePhoto();
-    if (dataUrl) setEvidencePhoto(dataUrl);
+    if (!dataUrl) return;
+    setEvidencePhoto(dataUrl);
+    await receipt.read(dataUrl, {
+      expectedAmountMXN: loan?.principalAmount,
+      current: { claveRastreo: declareClaveRastreo, bankFrom: declareBankFrom },
+      fill: { claveRastreo: setDeclareClaveRastreo, bankFrom: setDeclareBankFrom },
+    });
   };
 
   // Uploads the comprobante + runs the evidence_validation_agent against the
@@ -329,7 +339,7 @@ const LoanDetailPage: React.FC = () => {
 
       showToast('✓ Transferencia declarada — el prestatario debe confirmar la recepción');
       notifyDataChanged('funding_declared');
-      setDeclareClaveRastreo(''); setDeclareBankFrom(''); setRevealedClabe(null); setEvidencePhoto(null);
+      setDeclareClaveRastreo(''); setDeclareBankFrom(''); setRevealedClabe(null); setEvidencePhoto(null); receipt.reset();
       load();
     } catch (e: any) {
       showToast(e?.message ?? 'No se pudo declarar la transferencia', 'danger');
@@ -413,7 +423,7 @@ const LoanDetailPage: React.FC = () => {
                 <h2><IonIcon icon={cashOutline} /> Fondea este préstamo</h2>
                 <p>
                   Transfiere <strong>{fmt(loan.principalAmount)}</strong> desde tu banco a la CLABE del prestatario,
-                  luego declara la transferencia aquí. SmartLoans nunca envía el dinero por ti.
+                  luego declara la transferencia aquí. GMO Prestamos nunca envía el dinero por ti.
                 </p>
                 {!openFundingIntent ? (
                   <p className="lde-empty">No hay una intención de fondeo abierta para este préstamo. Contacta soporte.</p>
@@ -441,12 +451,16 @@ const LoanDetailPage: React.FC = () => {
                       <IonInput fill="outline" label="Banco de origen" labelPlacement="floating"
                         value={declareBankFrom} onIonInput={e => setDeclareBankFrom(e.detail.value ?? '')} />
                     </div>
-                    <IonButton expand="block" fill="outline" disabled={declaringFunding} onClick={handlePickEvidence}>
+                    <IonButton expand="block" fill="outline" disabled={declaringFunding || receipt.readingBusy} onClick={handlePickEvidence}>
                       <IonIcon icon={cameraOutline} slot="start" />
-                      {evidencePhoto ? 'Cambiar comprobante' : 'Adjuntar foto del comprobante (opcional)'}
+                      {evidencePhoto ? 'Cambiar comprobante' : 'Adjuntar comprobante (lo leemos por ti)'}
                     </IonButton>
                     {evidencePhoto && <IonImg src={evidencePhoto} className="lde-evidence-preview" />}
-                    <IonButton expand="block" disabled={declaringFunding || !declareClaveRastreo.trim()} onClick={handleDeclareFunding}>
+                    <TransferReadingNote
+                      busy={receipt.readingBusy} failed={receipt.readingFailed}
+                      result={receipt.result} expectedAmountMXN={loan?.principalAmount}
+                    />
+                    <IonButton expand="block" disabled={declaringFunding || receipt.readingBusy || !declareClaveRastreo.trim()} onClick={handleDeclareFunding}>
                       {declaringFunding
                         ? <><IonSpinner name="dots" /> {evidenceBusyLabel || 'Declarando…'}</>
                         : 'Ya transferí'}

@@ -9,7 +9,8 @@ import { useUser } from '../../../contexts/UserContext';
 import { getAllLoans, Loan } from '../../../api/loanApi';
 import { fetchActiveLoanOffers, countPendingProposalsForLender } from '../../../api/loanMarketplaceApi';
 import { getAllClients, Client } from '../../../api/clientsApi';
-import { ledgerStatement, LedgerEntry } from '../../../api/bankingApi';
+import { ledgerStatement, LedgerEntry, listBankAccounts, BankAccount } from '../../../api/bankingApi';
+import { p2pLendingRoute } from '../../../utils/routes';
 import { getAllClientFaceRecognitions, upsertClientFaceRecognition, ClientFaceRecognition } from '../../../api/clientFaceRecognitionApi';
 import { listContractsForClient } from '../../../api/digitalContractsApi';
 import { getStripeAccountStatus, createOrRefreshStripeAccount, StripeConnectedAccount } from '../../../api/stripeApi';
@@ -44,6 +45,11 @@ export function useLenderDashboard() {
   // Sum of this lender's ACTIVE published offers (loanOffers) — announced
   // capital, distinct from Capital total (disbursed loans) and the wallet.
   const [publishedCapital, setPublishedCapital] = useState(0);
+  // CLABE accounts (non-custodial SPEI payout destination) — setup step 2.
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [bankAccountsLoaded, setBankAccountsLoaded] = useState(false);
+  // First fetchAll finished — the setup card waits for it (never shows 0% before data).
+  const [baseLoaded, setBaseLoaded] = useState(false);
   // Pending borrower solicitudes — surfaced here too so the lender doesn't
   // have to enter P2P to find out someone is waiting for an answer.
   const [pendingProposals, setPendingProposals] = useState(0);
@@ -198,6 +204,11 @@ export function useLenderDashboard() {
         })
         .catch(() => setPublishedCapital(0))
         .finally(() => setOffersLoaded(true));
+      // CLABE accounts: setup step 2 ("Registrar cuenta bancaria").
+      listBankAccounts(companyId, lenderClientId)
+        .then(setBankAccounts)
+        .catch(() => setBankAccounts([]))
+        .finally(() => setBankAccountsLoaded(true));
       // Ledger movements: earnings (interest entries) + recent activity feed.
       setStatementLoaded(false);
       ledgerStatement(companyId, lenderClientId)
@@ -234,6 +245,7 @@ export function useLenderDashboard() {
       faceRecs.forEach(f => { if (f.clientSelfieBlobUrl) map[f.clientId] = f.clientSelfieBlobUrl; });
       setSelfieMap(map);
       setFaceRecord(faceRecs.find(f => f.clientId === lenderClientId) ?? null);
+      setBaseLoaded(true);
     } catch (e) {
       console.log('[LenderDashboard] fetchAll ❌', e);
       setError((e as Error).message);
@@ -269,6 +281,50 @@ export function useLenderDashboard() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, lenderClientId]);
+
+  // ── Primeros pasos: what a new lender must finish before lending ──────────
+  // 1) identity: same "verified" rule as VerificationCard (biometric + contract + pagaré);
+  // 2) a verified PRIMARY CLABE — isVerified alone is not enough, an ARCHIVED
+  //    account can arrive with isVerified=1 (D18), so isDefault is required too;
+  // 3) capital published in the marketplace (or already lent: a funded offer
+  //    stops counting as published, the loan shows it was done).
+  const identityVerified = !!(faceRecord?.isVerified && faceRecord?.contractAccepted && faceRecord?.pagareAccepted);
+  const primaryBankAccount = bankAccounts.find(a => a.isVerified && a.isDefault && a.accountStatus !== 'ARCHIVED') ?? null;
+  const setupSteps = [
+    {
+      id: 'identity',
+      label: 'Verifica tu identidad',
+      detail: identityVerified ? 'Identidad verificada' : `${verificationDone} de ${verificationSteps.length} pasos completados`,
+      done: identityVerified,
+      cta: verificationDone > 0 ? 'Continuar' : 'Verificar',
+      action: handleStartVerification,
+    },
+    {
+      id: 'bank',
+      label: 'Registra tu cuenta bancaria',
+      detail: primaryBankAccount
+        ? `${primaryBankAccount.bankName ?? 'CLABE'} · ····${primaryBankAccount.clabeLast4}`
+        : 'CLABE donde recibirás los pagos de tus préstamos',
+      done: !!primaryBankAccount,
+      cta: 'Registrar',
+      action: () => history.push(p2pLendingRoute(lenderClientId)),
+    },
+    {
+      id: 'capital',
+      label: 'Publica tu capital',
+      detail: publishedCapital > 0 || loans.length > 0
+        ? 'Tu capital ya está disponible para prestatarios'
+        : 'Indica cuánto quieres prestar en el marketplace',
+      done: publishedCapital > 0 || loans.length > 0,
+      cta: 'Publicar',
+      action: () => history.push(p2pLendingRoute(lenderClientId)),
+    },
+  ];
+  const setupDone = setupSteps.filter(s => s.done).length;
+  const setupPct = Math.round((setupDone / setupSteps.length) * 100);
+  const setupLoaded = baseLoaded && bankAccountsLoaded && offersLoaded;
+  // The next step to do: the first one not done (steps are meant in order).
+  const setupNextId = setupSteps.find(s => !s.done)?.id ?? null;
 
   // Las gráficas siguen cargando: si pasan 6 s, avisamos al cliente en vez de
   // dejarlo mirando spinners sin explicación.
@@ -347,6 +403,8 @@ export function useLenderDashboard() {
     // verification
     faceRecord, wizardStarting, handleStartVerification,
     verificationSteps, verificationDone, verificationInReview,
+    // primeros pasos (new-lender setup)
+    setupSteps, setupDone, setupPct, setupLoaded, setupNextId,
     // stripe
     stripeAccount, stripeLoading, stripeError, showStripeOnboarding,
     setShowStripeOnboarding,

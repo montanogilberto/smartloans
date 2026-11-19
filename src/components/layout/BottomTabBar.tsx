@@ -3,48 +3,88 @@ import { IonButton, IonIcon } from '@ionic/react';
 import { useHistory, useLocation } from 'react-router-dom';
 import {
   homeOutline, documentTextOutline, cardOutline, barChart, peopleOutline, chatbubblesOutline,
+  walletOutline, pulseOutline, personCircleOutline,
 } from 'ionicons/icons';
 import { useUser } from '../../contexts/UserContext';
-import { actsAsLender } from '../../utils/productContext';
+import { actsAsBorrower, actsAsLender } from '../../utils/productContext';
 import { myLoansRoute, p2pLendingRoute } from '../../utils/routes';
 import './BottomTabBar.css';
 
-type LenderTab = 'inicio' | 'prestamos' | 'pagos' | 'invertir' | 'invitar' | 'chat';
+interface Tab { id: string; label: string; icon: string; to: string }
 
 /**
- * Lender bottom nav — same tabs, targets and active-tab rules as POSVending's
- * App.tsx shell (Inicio / Préstamos / Pagos / Invertir / Invitar / Chat).
- * "Pagos" is a section of the lender dashboard (?section=pagos, the dashboard
- * scrolls to it); the others are routes. IonButtons instead of POS's raw
- * <button>s (CLAUDE.md §4); the .cd-tabbar / .cd-tab look comes from
- * theme/variables.css. Renders nothing for other sessions — the borrower bar
- * arrives with the borrower dashboard.
+ * Bottom nav — same tabs, targets and active-tab rules as POSVending's App.tsx
+ * shell, one set per product. IonButtons instead of POS's raw <button>s
+ * (CLAUDE.md §4); the .cd-tabbar / .cd-tab look comes from theme/variables.css.
+ *
+ * Lender: Inicio / Préstamos / Pagos / Invertir / Invitar / Chat. "Pagos" is a
+ * section of the lender dashboard (?section=pagos, it scrolls there).
+ * Borrower: Home / Préstamos / Pagos / Actividad / Perfil / Chat. The first five
+ * are ?tab= sections of the ONE borrower dashboard route, so the active tab is
+ * read from the query string (IonTabs matches by path only).
+ * Juridical: Inicio / Perfil, the small bar POS gives own-dashboard products.
  */
 const BottomTabBar: React.FC = () => {
   const history = useHistory();
   const location = useLocation();
   const { isAuthenticated, roleCode, activeProduct, clientId } = useUser();
 
-  if (!isAuthenticated || !actsAsLender(roleCode, activeProduct)) return null;
+  if (!isAuthenticated) return null;
+  const isLender = actsAsLender(roleCode, activeProduct);
+  const isBorrower = !isLender && actsAsBorrower(roleCode, activeProduct);
+  const isJuridical = !isLender && !isBorrower && activeProduct === 'juridical';
+  if (!isLender && !isBorrower && !isJuridical) return null;
 
-  const section = new URLSearchParams(location.search).get('section');
-  const active: LenderTab =
-    location.pathname.startsWith('/loan-chat') ? 'chat'
-      : location.pathname.startsWith('/p2p-lending') ? 'invertir'
-      : location.pathname.startsWith('/rewards') ? 'invitar'
+  const { pathname } = location;
+  const query = new URLSearchParams(location.search);
+  const onChat = pathname.startsWith('/loan-chat');
+
+  let tabs: Tab[];
+  let active: string;
+
+  if (isLender) {
+    const section = query.get('section');
+    active = onChat ? 'chat'
+      : pathname.startsWith('/p2p-lending') ? 'invertir'
+      : pathname.startsWith('/rewards') ? 'invitar'
       // A loan's detail is reached from Préstamos (POS left it on Inicio).
-      : location.pathname.startsWith('/my-loans') || location.pathname.startsWith('/loan-detail') ? 'prestamos'
+      : pathname.startsWith('/my-loans') || pathname.startsWith('/loan-detail') ? 'prestamos'
       : section === 'pagos' ? 'pagos'
       : 'inicio';
-
-  const tabs: { id: LenderTab; label: string; icon: string; to: string }[] = [
-    { id: 'inicio', label: 'Inicio', icon: homeOutline, to: `/lender-dashboard/${clientId}` },
-    { id: 'prestamos', label: 'Préstamos', icon: documentTextOutline, to: myLoansRoute(clientId) },
-    { id: 'pagos', label: 'Pagos', icon: cardOutline, to: `/lender-dashboard/${clientId}?section=pagos` },
-    { id: 'invertir', label: 'Invertir', icon: barChart, to: p2pLendingRoute(clientId) },
-    { id: 'invitar', label: 'Invitar', icon: peopleOutline, to: '/rewards' },
-    { id: 'chat', label: 'Chat', icon: chatbubblesOutline, to: '/loan-chats' },
-  ];
+    tabs = [
+      { id: 'inicio', label: 'Inicio', icon: homeOutline, to: `/lender-dashboard/${clientId}` },
+      { id: 'prestamos', label: 'Préstamos', icon: documentTextOutline, to: myLoansRoute(clientId) },
+      { id: 'pagos', label: 'Pagos', icon: cardOutline, to: `/lender-dashboard/${clientId}?section=pagos` },
+      { id: 'invertir', label: 'Invertir', icon: barChart, to: p2pLendingRoute(clientId) },
+      { id: 'invitar', label: 'Invitar', icon: peopleOutline, to: '/rewards' },
+      { id: 'chat', label: 'Chat', icon: chatbubblesOutline, to: '/loan-chats' },
+    ];
+  } else if (isJuridical) {
+    active = pathname.startsWith('/juridical-dashboard') ? 'inicio'
+      : pathname.startsWith('/profile') ? 'perfil'
+      : '';
+    tabs = [
+      { id: 'inicio', label: 'Inicio', icon: homeOutline, to: `/juridical-dashboard/${clientId}` },
+      { id: 'perfil', label: 'Perfil', icon: personCircleOutline, to: '/profile' },
+    ];
+  } else {
+    const dashboard = `/client-dashboard/${clientId}`;
+    const onDashboard = pathname.startsWith('/client-dashboard');
+    active = onChat ? 'chat'
+      : onDashboard ? (query.get('tab') || 'home')
+      // A loan's detail / the loans list belong under Préstamos.
+      : pathname.startsWith('/loan-detail') || pathname.startsWith('/my-loans') ? 'loans'
+      : pathname.startsWith('/payment') ? 'payments'
+      : '';
+    tabs = [
+      { id: 'home', label: 'Home', icon: homeOutline, to: `${dashboard}?tab=home` },
+      { id: 'loans', label: 'Préstamos', icon: walletOutline, to: `${dashboard}?tab=loans` },
+      { id: 'payments', label: 'Pagos', icon: cardOutline, to: `${dashboard}?tab=payments` },
+      { id: 'activity', label: 'Actividad', icon: pulseOutline, to: `${dashboard}?tab=activity` },
+      { id: 'profile', label: 'Perfil', icon: personCircleOutline, to: `${dashboard}?tab=profile` },
+      { id: 'chat', label: 'Chat', icon: chatbubblesOutline, to: '/loan-chats' },
+    ];
+  }
 
   return (
     <nav slot="bottom" className="cd-tabbar" aria-label="Navegación">

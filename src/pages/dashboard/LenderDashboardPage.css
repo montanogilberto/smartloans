@@ -672,3 +672,114 @@
   width: 34px;
   height: 34px;
 }
+
+/* ── Primeros pasos (LenderSetupCard) ───────────────────────────── */
+.ld-setup {
+  border: 1px solid rgba(5, 150, 105, 0.25);
+}
+
+.ld-setup-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ion-color-medium);
+  font-size: 14px;
+}
+
+.ld-setup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ld-setup-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ion-text-color, #111827);
+}
+
+.ld-setup-sub {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ion-color-medium);
+}
+
+.ld-setup-pct {
+  flex-shrink: 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: #059669;
+  line-height: 1;
+}
+
+.ld-setup-bar {
+  --background: rgba(5, 150, 105, 0.15);
+  --progress-background: #059669;
+  height: 8px;
+  border-radius: 4px;
+  margin: 12px 0 8px;
+}
+
+.ld-setup-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ld-setup-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.ld-setup-step:last-child {
+  border-bottom: none;
+}
+
+.ld-setup-step-icon {
+  flex-shrink: 0;
+  font-size: 22px;
+  color: #cbd5e1;
+}
+
+.ld-setup-step--done .ld-setup-step-icon {
+  color: #059669;
+}
+
+.ld-setup-step--next .ld-setup-step-icon {
+  color: #2563eb;
+}
+
+.ld-setup-step-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ld-setup-step-text strong {
+  font-size: 14px;
+  color: var(--ion-text-color, #111827);
+}
+
+.ld-setup-step-text span {
+  font-size: 12px;
+  color: var(--ion-color-medium);
+}
+
+.ld-setup-step--done .ld-setup-step-text strong {
+  color: var(--ion-color-medium);
+  text-decoration: line-through;
+}
+
+.ld-setup-step-btn {
+  flex-shrink: 0;
+  margin: 0;
+  --border-radius: 16px;
+  text-transform: none;
+}

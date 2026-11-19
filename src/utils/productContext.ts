@@ -13,9 +13,9 @@ export type ProductContext = 'pos' | 'borrower' | 'lender' | 'juridical' | 'fact
 
 export const PRODUCT_LABELS: Record<ProductContext, string> = {
   pos:      'POS GMO',
-  borrower: 'SmartLoans · Acreditado',
-  lender:   'SmartLoans · Prestamista',
-  juridical: 'SmartLoans · Jurídico',
+  borrower: 'GMO Prestamos · Acreditado',
+  lender:   'GMO Prestamos · Prestamista',
+  juridical: 'GMO Prestamos · Jurídico',
   factory:  'Factory AI Software',
 };
 

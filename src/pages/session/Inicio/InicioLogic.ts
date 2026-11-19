@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useUser } from '../../../contexts/UserContext';
-import { smartLoansLanding } from '../../../utils/smartLoansLanding';
+import { smartLoansLanding, smartLoansProductFor } from '../../../utils/smartLoansLanding';
 
 const LOAD_TIMEOUT_MS = 10000;
 
@@ -19,7 +19,7 @@ export type InicioState = 'loading' | 'load-failed';
 export function useInicio() {
   const history = useHistory();
   const {
-    companyId, clientId, clientCapabilitiesKey, availableProducts, activeProduct, logout, refreshCapabilities,
+    companyId, clientId, clientCapabilitiesKey, availableProducts, activeProduct, setActiveProduct, logout, refreshCapabilities,
   } = useUser();
   const [timedOut, setTimedOut] = useState(false);
   const [retrying, setRetrying] = useState(false);
@@ -27,10 +27,19 @@ export function useInicio() {
   const capabilitiesLoaded = !clientId || clientCapabilitiesKey === `${companyId}:${clientId}`;
   const landing = smartLoansLanding(availableProducts, activeProduct, clientId);
 
+  // A POS/Rewards account (roleCode 'pos') starts with activeProduct 'pos'. Switch
+  // the session to the SmartLoans product it lands on — the tab bar, side menu
+  // and Header all read activeProduct, not the URL.
+  const product = smartLoansProductFor(availableProducts, activeProduct);
+
   useEffect(() => {
+    if (product && product !== activeProduct) {
+      console.log('[Inicio] active product', activeProduct, '→', product);
+      setActiveProduct(product);
+    }
     if (landing) history.replace(landing);
     else if (capabilitiesLoaded) history.replace(ENROLLMENT_ROUTE);
-  }, [landing, capabilitiesLoaded]);
+  }, [landing, capabilitiesLoaded, product, activeProduct]);
 
   useEffect(() => {
     if (capabilitiesLoaded) return;

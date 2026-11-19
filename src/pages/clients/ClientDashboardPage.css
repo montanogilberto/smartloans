@@ -1,0 +1,807 @@
+.client-dashboard-page.fintech-surface {
+  --background: radial-gradient(circle at top left, #f9fbff 0%, #f3f6ff 40%, #eef2fb 100%);
+}
+
+.dashboard-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.client-dashboard-card {
+  margin: 0;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(18, 28, 45, 0.07);
+  box-shadow: 0 16px 40px rgba(18, 38, 63, 0.08);
+  backdrop-filter: saturate(140%) blur(6px);
+  -webkit-backdrop-filter: saturate(140%) blur(6px);
+}
+
+.client-dashboard-card ion-card-header {
+  padding-bottom: 0;
+}
+
+.client-dashboard-card ion-card-title {
+  font-size: 1.08rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #0e1a2f;
+}
+
+.loan-progress-complete-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #059669;
+}
+
+.loan-progress-complete-row ion-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.hero-card ion-card-content {
+  padding: 20px;
+}
+
+.hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.hero-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.hero-avatar {
+  width: 62px;
+  height: 62px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 22px rgba(31, 67, 120, 0.2);
+}
+
+.hero-name {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 700;
+  color: #0f1f38;
+}
+
+.hero-meta {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.status-badge {
+  border-radius: 999px;
+  padding: 6px 11px;
+  font-weight: 600;
+  font-size: 0.73rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-badge.verified {
+  background: rgba(47, 180, 95, 0.14);
+  color: #148742;
+}
+
+.status-badge.tier {
+  background: rgba(39, 102, 255, 0.12);
+  color: #245de2;
+}
+
+.status-badge.available {
+  background: rgba(24, 135, 66, 0.14);
+  color: #148742;
+}
+
+.hero-balance {
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.hero-progress-pill {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.12);
+}
+
+.hero-progress-pct {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #2563eb;
+  line-height: 1;
+}
+
+.hero-progress-label {
+  font-size: 0.6rem;
+  color: #6b7280;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.hero-balance span {
+  display: block;
+  font-size: 0.82rem;
+  color: #72809a;
+  margin-bottom: 6px;
+}
+
+.hero-balance h1 {
+  margin: 0;
+  font-size: 2.05rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: #0a1630;
+}
+
+.summary-grid {
+  padding: 0;
+}
+
+.mini-summary-card ion-card-content {
+  padding: 16px;
+}
+
+.mini-summary-card p {
+  margin: 8px 0 6px;
+  color: #74839f;
+  font-size: 0.82rem;
+}
+
+.mini-summary-card h3 {
+  margin: 0;
+  font-size: 1.04rem;
+  color: #0f213d;
+  font-weight: 700;
+}
+
+.summary-icon {
+  font-size: 1.2rem;
+  color: #2a5be7;
+}
+
+.agent-card ion-card-content,
+.credit-status-card ion-card-content,
+.recent-activity-card ion-card-content,
+.notifications-card ion-card-content,
+.quick-actions-card ion-card-content {
+  padding-top: 10px;
+}
+
+.agent-top {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.agent-avatar {
+  width: 58px;
+  height: 58px;
+}
+
+.agent-top h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #0e1d36;
+}
+
+.agent-top p {
+  margin: 4px 0 8px;
+  font-size: 0.82rem;
+  color: #6f7f9b;
+}
+
+.agent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.agent-actions ion-button {
+  --border-radius: 999px;
+  font-size: 0.78rem;
+  min-height: 38px;
+}
+
+.agent-last-contact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 0.78rem;
+  color: #76839a;
+}
+
+.credit-score-wrap {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.credit-score-wrap p {
+  margin: 0 0 4px;
+  color: #75839e;
+  font-size: 0.8rem;
+}
+
+.credit-score-wrap h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #0b1b33;
+  letter-spacing: -0.01em;
+}
+
+.utilization-track {
+  margin-top: 14px;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(33, 84, 219, 0.12);
+  overflow: hidden;
+}
+
+.utilization-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2d66f0 0%, #56c2f8 100%);
+}
+
+.client-dashboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.client-dashboard-item {
+  --background: rgba(255, 255, 255, 0.5);
+  --padding-start: 12px;
+  --padding-end: 12px;
+  --inner-padding-end: 0;
+  border-radius: 16px;
+  border: 1px solid rgba(14, 26, 47, 0.05);
+}
+
+.client-dashboard-item h3 {
+  margin: 0 0 4px;
+  font-size: 0.94rem;
+  color: #0f1d34;
+}
+
+.client-dashboard-item p {
+  margin: 0 0 4px;
+  color: #70809a;
+  font-size: 0.82rem;
+}
+
+.client-dashboard-item ion-note {
+  color: #7b88a2;
+  font-size: 0.76rem;
+}
+
+.client-dashboard-empty-state {
+  display: block;
+  text-align: center;
+  padding: 18px;
+  color: #7b88a2;
+}
+
+.client-dashboard-action-button {
+  margin: 4px 0;
+  --border-radius: 999px;
+  min-height: 46px;
+  font-weight: 700;
+}
+
+.floating-bottom-nav {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  width: min(94%, 520px);
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(18, 28, 45, 0.08);
+  box-shadow: 0 14px 34px rgba(22, 44, 82, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 20;
+  backdrop-filter: blur(8px);
+}
+
+.nav-item {
+  border: none;
+  background: transparent;
+  color: #5a6b87;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.73rem;
+}
+
+.nav-item ion-icon {
+  font-size: 1.2rem;
+}
+
+.nav-active-pill {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2b63f0 0%, #6dc7fa 100%);
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+
+.nav-item small {
+  font-size: 0.68rem;
+}
+
+@media (min-width: 768px) {
+  .dashboard-shell { gap: 22px; }
+  .hero-balance h1 { font-size: 2.3rem; }
+}
+
+/* ── Loan cards ─────────────────────────────────────────────────────────── */
+.cd-loan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cd-loan-card {
+  background: #f9fbff;
+  border: 1px solid rgba(14, 26, 47, 0.07);
+  border-radius: 18px;
+  padding: 14px 16px;
+}
+
+.cd-loan-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.cd-loan-number {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #0f1f38;
+  font-family: monospace;
+}
+
+.cd-loan-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.cd-loan-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.cd-loan-amounts div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cd-loan-amounts small {
+  font-size: 0.72rem;
+  color: #74839f;
+}
+
+.cd-loan-amounts strong {
+  font-size: 0.96rem;
+  color: #0e1a2f;
+}
+
+.cd-loan-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.76rem;
+  color: #74839f;
+}
+
+.cd-loan-meta ion-icon {
+  vertical-align: middle;
+  font-size: 0.9rem;
+}
+
+.cd-loan-notes {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  color: #8897b0;
+  font-style: italic;
+}
+
+/* ── Empty state ────────────────────────────────────────────────────────── */
+.cd-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 16px;
+  color: #8898b2;
+}
+
+.cd-empty-state ion-icon {
+  font-size: 2.2rem;
+  opacity: 0.45;
+}
+
+.cd-empty-state p {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+/* ── Next payment card ──────────────────────────────────────────────────── */
+.cd-next-payment-card ion-card-content {
+  padding: 20px;
+}
+
+.cd-next-payment-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.cd-next-payment-icon {
+  font-size: 2rem;
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+  padding: 10px;
+  border-radius: 14px;
+}
+
+.cd-next-payment-top h2 {
+  margin: 4px 0;
+  font-size: 1.6rem;
+  color: #0a1630;
+}
+
+.cd-next-payment-top p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #74839f;
+}
+
+/* ── Activity dot ───────────────────────────────────────────────────────── */
+.cd-activity-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #2a5be7;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+
+/* ── Profile list ───────────────────────────────────────────────────────── */
+.cd-profile-list {
+  background: transparent;
+}
+
+.cd-profile-list ion-item {
+  --background: transparent;
+  --padding-start: 0;
+}
+
+/* ── Loan form modal ────────────────────────────────────────────────────── */
+.cd-loan-form {
+  padding: 4px 0 40px;
+}
+
+.cd-form-group {
+  margin-bottom: 16px;
+}
+
+/* Native Ionic form controls (IonInput/IonSelect with fill="outline" +
+   floating labels) draw their own border, background and label — the old
+   raw <label> + .cd-form-input styling is no longer needed. */
+
+.cd-loan-preview {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #1e40af;
+  margin-top: 4px;
+}
+
+.cd-loan-preview p { margin: 3px 0; }
+.cd-loan-preview strong { display: block; margin-bottom: 6px; font-size: 14px; }
+
+/* ── Cuenta bancaria (SPEI) ─────────────────────────────────── */
+/* Nota del riel directo: ancho completo de la tarjeta (a diferencia de
+   .cd-stripe-sub, que va centrada y angosta dentro del empty state). */
+.cd-bank-note {
+  font-size: 0.85rem; line-height: 1.45; color: #74839f; margin: 0 0 8px;
+}
+
+/* ── Stripe payment section ─────────────────────────────────── */
+.cd-stripe-header { display: flex; align-items: center; justify-content: space-between; }
+.cd-stripe-loading { color: #74839f; text-align: center; font-size: 0.9rem; }
+
+.cd-stripe-empty {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8px; padding: 16px 0; text-align: center; color: #74839f;
+}
+.cd-stripe-big-icon { font-size: 2.4rem; color: #c7d2e8; }
+.cd-stripe-sub { font-size: 0.82rem; color: #9aa5bc; max-width: 240px; }
+.cd-stripe-cta { margin-top: 12px; --background: #635bff; --color: #fff; }
+
+.cd-stripe-status { display: flex; flex-direction: column; gap: 12px; }
+.cd-stripe-row { display: flex; align-items: flex-start; gap: 12px; }
+.cd-stripe-icon-ok { font-size: 1.6rem; color: #148742; flex-shrink: 0; }
+.cd-stripe-icon-warn { font-size: 1.6rem; color: #b45309; flex-shrink: 0; }
+.cd-stripe-acct-id { font-size: 0.72rem; color: #9aa5bc; margin: 2px 0 0; font-family: monospace; }
+
+.cd-stripe-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.cd-chip {
+  padding: 4px 10px; border-radius: 99px; font-size: 0.74rem; font-weight: 600;
+}
+.cd-chip-ok { background: #d1fae5; color: #065f46; }
+.cd-chip-off { background: #fee2e2; color: #991b1b; }
+
+/* Transaction list */
+.cd-tx-item { --border-radius: 12px; margin-bottom: 4px; }
+.cd-tx-currency { font-size: 0.72rem; color: #9aa5bc; margin-left: 4px; }
+.cd-tx-badge { font-size: 0.68rem; padding: 3px 8px; border-radius: 99px; }
+.cd-tx-ok { --background: #d1fae5; --color: #065f46; }
+.cd-tx-pending { --background: #fef3c7; --color: #92400e; }
+.cd-tx-fail { --background: #fee2e2; --color: #991b1b; }
+
+/* Pay modal */
+.cd-pay-success {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 10px; padding: 32px 16px; text-align: center;
+}
+.cd-pay-success-icon { font-size: 3.5rem; color: #148742; }
+
+/* ── Credit + payment-methods card (replaces the payout-account nag) ── */
+.cd-credit-card {
+  background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+}
+.cd-credit-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cd-credit-amount {
+  margin: 0;
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.1;
+}
+.cd-credit-label {
+  font-size: 0.95rem;
+  color: #374151;
+}
+.cd-credit-due {
+  font-size: 0.85rem;
+  color: #6b7280;
+  text-align: right;
+  max-width: 45%;
+}
+
+.cd-pay-methods {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.cd-pay-tile {
+  width: 78px;
+  height: 52px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 8px 10px;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+.cd-pay-last4 {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #111827;
+}
+.cd-pay-brand {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: #6b7280;
+  letter-spacing: 0.03em;
+}
+.cd-pay-tile-payout {
+  background: linear-gradient(135deg, #d1fae5 0%, #e0f2fe 100%);
+}
+.cd-pay-payout-icon {
+  font-size: 1.1rem;
+  color: #059669;
+}
+.cd-pay-add {
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
+  box-shadow: none;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  cursor: pointer;
+}
+.cd-pay-add ion-icon {
+  font-size: 1.4rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .cd-credit-amount { color: #f9fafb; }
+  .cd-credit-label { color: #d1d5db; }
+  .cd-pay-tile { background: #1f2937; }
+  .cd-pay-last4 { color: #f9fafb; }
+  .cd-pay-add { background: #111827; border-color: #374151; }
+}
+
+/* Next-payment due date under the hero balance (merged credit card) */
+.hero-balance .hero-due {
+  font-size: 0.78rem;
+  color: #72809a;
+  margin: 4px 0 0;
+}
+
+/* ── Hero KPI strip (moved in from the old summary grid) ── */
+.hero-stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+.hero-stat { display: flex; flex-direction: column; gap: 2px; }
+.hero-stat span { font-size: 0.72rem; color: #72809a; }
+.hero-stat strong { font-size: 0.98rem; color: #0a1630; font-weight: 700; }
+
+/* ── Tu Agente card ── */
+.cd-agent-top { display: flex; align-items: center; gap: 14px; }
+.cd-agent-avatar { width: 60px; height: 60px; }
+.cd-agent-info { display: flex; flex-direction: column; gap: 2px; }
+.cd-agent-heading { font-size: 0.72rem; color: #72809a; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.cd-agent-name { margin: 0; font-size: 1.05rem; font-weight: 700; color: #0a1630; }
+.cd-agent-id { font-size: 0.78rem; color: #6b7280; }
+.cd-agent-status {
+  align-self: flex-start;
+  margin-top: 4px;
+  --background: #dcfce7;
+  --color: #15803d;
+  font-size: 0.72rem;
+  border-radius: 999px;
+}
+.cd-agent-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.cd-agent-btn { flex: 1; min-width: 92px; --border-radius: 999px; font-size: 0.8rem; }
+.cd-agent-last {
+  margin: 14px 0 0;
+  font-size: 0.78rem;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hero-stat strong, .cd-agent-name { color: #f9fafb; }
+  .hero-stats { border-top-color: rgba(255, 255, 255, 0.08); }
+}
+
+/* Banner: solicitudes P2P enviadas en espera de respuesta */
+.pending-proposals-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fef9c3;
+  border: 1px solid #fde047;
+  color: #854d0e;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 4px 0 12px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.pending-proposals-banner ion-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.pending-proposals-banner span {
+  flex: 1;
+}
+
+/* Cuotas SPEI (tab Pagos) */
+.cd-wallet-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.cd-cuota-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.cd-cuota-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cd-cuota-info strong {
+  font-size: 14px;
+}
+
+.cd-cuota-info span {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.cd-cuota-paid .cd-cuota-info strong {
+  color: #059669;
+}
+
+/* QR modal placeholder while the signed GMO1 value loads / on error */
+.cd-qr-placeholder {
+  width: 220px;
+  height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px;
+  text-align: center;
+}
+
+.cd-qr-loading-text {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #6b7280;
+}

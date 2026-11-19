@@ -3,8 +3,8 @@ import type { CapacitorConfig } from '@capacitor/cli';
 // appId confirmed 2026-11-19 (same prefix as POS, com.factoryAI.gmo). It's baked
 // into ios/ and android/ and can't change once the app is in the stores.
 const config: CapacitorConfig = {
-  appId: 'com.factoryAI.smartloans',
-  appName: 'SmartLoans',
+  appId: 'com.factoryAI.gmoprestamos',
+  appName: 'GMO Prestamos',
   webDir: 'dist',
   plugins: {
     StatusBar: {

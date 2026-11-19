@@ -1,4 +1,4 @@
-package com.factoryAI.smartloans;
+package com.factoryAI.gmoprestamos;
 
 import com.getcapacitor.BridgeActivity;
 

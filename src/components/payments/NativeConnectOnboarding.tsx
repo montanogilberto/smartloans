@@ -263,7 +263,7 @@ const OnboardingForm: React.FC<Props> = ({ clientId, companyId, email, onProgres
             </IonItem>
             <IonItem lines="none">
               <IonCheckbox slot="start" checked={acceptedTos} onIonChange={(e) => setAcceptedTos(e.detail.checked)} />
-              <IonLabel className="nco-tos">Acepto el Acuerdo de Servicios de Stripe y los términos de SmartLoans.</IonLabel>
+              <IonLabel className="nco-tos">Acepto el Acuerdo de Servicios de Stripe y los términos de GMO Prestamos.</IonLabel>
             </IonItem>
           </IonList>
           <IonButton expand="block" shape="round" disabled={busy || !identityValid} onClick={submitIdentity}>
@@ -293,7 +293,7 @@ const OnboardingForm: React.FC<Props> = ({ clientId, companyId, email, onProgres
             </IonItem>
           </IonList>
 
-          <IonNote className="nco-hint">Tus datos se cifran y envían directamente a Stripe. SmartLoans nunca almacena el número completo.</IonNote>
+          <IonNote className="nco-hint">Tus datos se cifran y envían directamente a Stripe. GMO Prestamos nunca almacena el número completo.</IonNote>
           <IonButton expand="block" shape="round" disabled={busy} onClick={submitPayout}>
             {busy ? <IonSpinner name="crescent" /> : 'Registrar cuenta de pago'}
           </IonButton>

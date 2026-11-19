@@ -6,6 +6,13 @@ export const SMARTLOANS_PRODUCTS: readonly ProductContext[] = ['borrower', 'lend
 export const isSmartLoansProduct = (p: ProductContext | null | undefined): p is ProductContext =>
   !!p && SMARTLOANS_PRODUCTS.includes(p);
 
+/** The SmartLoans product a session should run as: the active one when it is a
+ * SmartLoans product, else the first one the account holds (null = none). */
+export const smartLoansProductFor = (
+  available: readonly ProductContext[],
+  active: ProductContext | null,
+): ProductContext | null => (isSmartLoansProduct(active) ? active : available.find(isSmartLoansProduct) ?? null);
+
 /**
  * Where a signed-in session lands in SmartLoans: the active product when it is a
  * SmartLoans one, else the first SmartLoans product the account holds.
@@ -17,6 +24,6 @@ export const smartLoansLanding = (
   clientId: number,
 ): string | null => {
   if (!clientId) return null;
-  const product = isSmartLoansProduct(active) ? active : available.find(isSmartLoansProduct);
+  const product = smartLoansProductFor(available, active);
   return product ? productLandingRoute(product, clientId) : null;
 };
