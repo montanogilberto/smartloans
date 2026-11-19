@@ -240,6 +240,12 @@ const ExpedienteDigitalPage: React.FC = () => {
                 kind="pdf"
                 meta={pagareDate ? `Aceptado: ${pagareDate}` : undefined}
               />
+              <DocSlot
+                title="Constancia de resguardo"
+                url={record?.resguardoPdfBlobUrl ?? undefined}
+                kind="pdf"
+                meta={pagareDate ? `Firmada: ${pagareDate}` : undefined}
+              />
             </div>
             <p className="expediente-physical-pagare">
               <IonIcon icon={record?.hasPhysicalPagare ? checkmarkCircle : closeCircle} />
@@ -262,6 +268,7 @@ const ExpedienteDigitalPage: React.FC = () => {
               client?.qrBlobUrl,
               record?.contractPdfBlobUrl,
               record?.pagarePdfBlobUrl,
+              record?.resguardoPdfBlobUrl,
             ]
               .filter((url): url is string => !!url)
               .forEach((url) => window.open(url, '_blank', 'noopener,noreferrer'));

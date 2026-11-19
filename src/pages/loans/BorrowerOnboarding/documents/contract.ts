@@ -1,8 +1,8 @@
 /**
- * Contrato de Crédito Personal P2P — POS GMO.
+ * Contrato de Crédito Personal P2P — GMO Prestamos.
  * Documento legal estático, separado de la UI (misma razón que pagare.ts).
  */
-export const CONTRACT_TEXT = `CONTRATO DE CRÉDITO PERSONAL P2P — POS GMO
+export const CONTRACT_TEXT = `CONTRATO DE CRÉDITO PERSONAL P2P — GMO PRESTAMOS
 
 Ciudad de México, a _______________
 
@@ -12,7 +12,7 @@ PARTES:
 
 PRIMERA — OBJETO: El Acreditante otorga al Acreditado un crédito personal de hasta $_________________ M.N. bajo las condiciones establecidas en el Pagaré firmado en este mismo acto.
 
-SEGUNDA — TASA Y PLAZO: La tasa de interés, el plazo y la forma de pago quedarán determinados en el Pagaré correspondiente y en la oferta aceptada dentro de la plataforma POS GMO.
+SEGUNDA — TASA Y PLAZO: La tasa de interés, el plazo y la forma de pago quedarán determinados en el Pagaré correspondiente y en la oferta aceptada dentro de la plataforma GMO Prestamos.
 
 TERCERA — OBLIGACIONES DEL ACREDITADO:
 a) Destinar los recursos al fin declarado.
@@ -25,7 +25,7 @@ i) Cobrar intereses moratorios al doble de la tasa ordinaria pactada.
 ii) Hacer exigible la totalidad del crédito de manera anticipada.
 iii) Ejercer acción ejecutiva mercantil con base en el Pagaré suscrito.
 
-QUINTA — DATOS PERSONALES: El Acreditado consiente expresamente el tratamiento de sus datos personales, incluyendo datos biométricos, conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP) y el Aviso de Privacidad de POS GMO.
+QUINTA — DATOS PERSONALES: El Acreditado consiente expresamente el tratamiento de sus datos personales, incluyendo datos biométricos, conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP) y el Aviso de Privacidad de GMO Prestamos.
 
 SEXTA — MEDIACIÓN: Antes de iniciar cualquier procedimiento judicial, las partes acuerdan someter la controversia a mediación ante la Procuraduría Federal del Consumidor (PROFECO) o institución equivalente.
 

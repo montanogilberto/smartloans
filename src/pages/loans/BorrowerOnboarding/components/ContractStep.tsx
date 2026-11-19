@@ -36,7 +36,7 @@ const ContractStep: React.FC<{ vm: BorrowerOnboardingVM }> = ({ vm }) => (
             checked={vm.contractAccepted}
             onIonChange={e => vm.setContractAccepted(e.detail.checked)}
           >
-            He leído, entendido y acepto íntegramente el Contrato de Crédito Personal P2P, incluyendo el tratamiento de mis datos personales y biométricos conforme al Aviso de Privacidad de POS GMO.
+            He leído, entendido y acepto íntegramente el Contrato de Crédito Personal P2P, incluyendo el tratamiento de mis datos personales y biométricos conforme al Aviso de Privacidad de GMO Prestamos.
           </IonCheckbox>
         </div>
       </>

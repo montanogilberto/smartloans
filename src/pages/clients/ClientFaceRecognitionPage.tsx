@@ -20,8 +20,14 @@ import {
   IonCheckbox,
   IonIcon,
   IonSpinner,
+  IonModal,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonButtons,
+  useIonAlert,
 } from '@ionic/react';
-import { checkmark, chevronForward, cameraOutline, refreshOutline, personOutline, idCardOutline } from 'ionicons/icons';
+import { checkmark, chevronForward, cameraOutline, refreshOutline, personOutline, idCardOutline, documentTextOutline, close } from 'ionicons/icons';
 import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
@@ -54,7 +60,9 @@ import {
 import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../../utils/faceLiveness';
 import { ExtractedIdFields, extractIneFields } from '../../utils/idOcr';
 import { cropIneSignatureRegion } from '../../utils/signatureCrop';
-import { generateContractPdfBase64, generatePagarePdfBase64 } from '../../utils/contractPdf';
+import {
+  KYC_DOCUMENTS, KycDocumentId, generateContractPdfBase64, generatePagarePdfBase64, generateResguardoPdfBase64,
+} from '../../utils/contractPdf';
 
 import './ClientFaceRecognitionPage.css';
 
@@ -64,6 +72,8 @@ const EMPTY_EXTRACTED_ID_FIELDS: ExtractedIdFields = {
   curp: '',
   claveElector: '',
   fechaNacimiento: '',
+  cic: '',
+  ocr: '',
 };
 
 // Sub-steps inside the capture wizard step
@@ -182,6 +192,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
           curp: record.curp ?? '',
           claveElector: record.claveElector ?? '',
           fechaNacimiento: record.fechaNacimiento ?? '',
+          // RFC-015: only present once the all-records SP returns them; '' until then.
+          cic: record.cic ?? '',
+          ocr: record.ocr ?? '',
         };
         if (Object.values(extracted).some(Boolean)) setExtractedIdFields(extracted);
 
@@ -201,7 +214,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
         // requires it), so the remaining step is payment when present,
         // otherwise the run is complete and we clamp to the last step.
         const resumeStep = record.contractAccepted
-          ? (continueToPayments ? 5 : lastStepIndex)
+          ? (continueToPayments ? 6 : lastStepIndex)
           : record.isVerified ? 3
           : (record.idFrontImageBlobUrl && record.idBackImageBlobUrl) ? 2
           : 0;
@@ -237,6 +250,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const [contractAccepted, setContractAccepted] = useState<boolean>(false);
   const [pagareAccepted, setPagareAccepted] = useState<boolean>(false);
   const [hasPhysicalPagare, setHasPhysicalPagare] = useState<boolean>(false);
+  // The legal document open for reading at the Contrato step (null = none).
+  const [readingDoc, setReadingDoc] = useState<KycDocumentId | null>(null);
+  const [presentAlert] = useIonAlert();
   const [contractAcceptedAt, setContractAcceptedAt] = useState<string>('');
   const [livenessStatus, setLivenessStatus] = useState<'idle' | 'ready' | 'in-progress' | 'completed' | 'failed'>('idle');
   const [idInfoConfirmed, setIdInfoConfirmed] = useState<boolean>(false);
@@ -267,12 +283,12 @@ const ClientFaceRecognitionPage: React.FC = () => {
     selectedClient?.clientType === 'lender' || selectedClient?.clientType === 'both';
   const paymentStepLabel = isPayoutClient ? 'Cuenta de pago' : 'Tarjeta';
 
-  // Firma (signature) is its own step now, split out of Contrato: the client
-  // accepts the terms on step 3, then signs on step 4, then (if the launch
-  // includes it) the payment step is 5.
+  // Verificación (2) only shows the biometric result; Datos (3) is the review
+  // of what was read from the INE; Contrato (4) is reading + accepting the three
+  // documents; Firma (5) signs and submits; payment (6) when the launch includes it.
   const STEPS = continueToPayments
-    ? ['Cliente y documento', 'Captura', 'Verificación', 'Contrato', 'Firma', paymentStepLabel]
-    : ['Cliente y documento', 'Captura', 'Verificación', 'Contrato', 'Firma'];
+    ? ['Cliente y documento', 'Captura', 'Verificación', 'Datos', 'Contrato', 'Firma', paymentStepLabel]
+    : ['Cliente y documento', 'Captura', 'Verificación', 'Datos', 'Contrato', 'Firma'];
 
   // Single source of truth for step tracking: logs EVERY step / capture
   // sub-step transition regardless of which handler (goNext, goBack, jump,
@@ -299,13 +315,19 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // appears.
   useEffect(() => {
     if (!idFrontImageBase64 || !idBackImageBase64) return;
-    const key = `${idFrontImageBase64.length}:${idBackImageBase64.length}`;
+    // The full-resolution front, when its upload has landed: CURP is the
+    // smallest text on the INE and sits on the anti-copy watermark, so the
+    // ~1100px OCR image left it unreadable (the agent returns "" rather than
+    // guess). A hi-res URL that lands after the first pass re-runs it — the
+    // merge below only replaces fields the new pass actually read.
+    const frontUrl = idFrontHiResBlobUrl || idFrontImageBlobUrl;
+    const key = `${idFrontImageBase64.length}:${idBackImageBase64.length}:${idFrontHiResBlobUrl}`;
     if (ocrRanForRef.current === key) return;
     ocrRanForRef.current = key;
 
     let cancelled = false;
     console.log('[Expediente] OCR effect: running OCR on front+back captures', JSON.stringify({
-      frontSource: idFrontImageBlobUrl ? 'blobUrl' : 'base64',
+      frontSource: idFrontHiResBlobUrl ? 'hiResBlobUrl' : idFrontImageBlobUrl ? 'blobUrl' : 'base64',
       backSource: idBackImageBlobUrl ? 'blobUrl' : 'base64',
       idFrontImageBlobUrl: idFrontImageBlobUrl || '(not uploaded yet)',
       idBackImageBlobUrl: idBackImageBlobUrl || '(not uploaded yet)',
@@ -318,14 +340,18 @@ const ClientFaceRecognitionPage: React.FC = () => {
     // early upload has already landed; base64 covers the case where it
     // hasn't (or failed), so OCR still starts as soon as the captures exist.
     extractIneFields({
-      frontUrl: idFrontImageBlobUrl || undefined,
+      frontUrl: frontUrl || undefined,
       backUrl: idBackImageBlobUrl || undefined,
       frontBase64: idFrontImageBase64,
       backBase64: idBackImageBase64,
     })
       .then(({ fields, lowConfidenceFields }) => {
         if (cancelled) return;
-        console.log('[Expediente] OCR effect: result', JSON.stringify(fields), 'lowConfidence:', lowConfidenceFields);
+        // Which fields were read, never their values (CURP, name, address are personal data).
+        console.log('[Expediente] OCR effect: result', JSON.stringify({
+          filled: (Object.keys(fields) as (keyof ExtractedIdFields)[]).filter((k) => !!fields[k]),
+          lowConfidence: lowConfidenceFields,
+        }));
         // Merge, don't overwrite: a later/softer re-capture often reads small
         // fields (CURP, claveElector) as empty, and a blind overwrite would wipe
         // a value a sharper earlier capture already read correctly. Only replace
@@ -354,7 +380,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idFrontImageBase64, idBackImageBase64]);
+  }, [idFrontImageBase64, idBackImageBase64, idFrontHiResBlobUrl]);
 
   // No pre-provision step here anymore: NativeConnectOnboarding creates the
   // Custom connected account itself on identity submit (create-or-refresh is
@@ -800,6 +826,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
         curp: cap(extractedIdFields.curp, 18),
         claveElector: cap(extractedIdFields.claveElector, 20),
         fechaNacimiento: cap(extractedIdFields.fechaNacimiento, 10),
+        // RFC-015: digits only; the backend keeps them only at exactly 9 / 13 digits.
+        cic: cap(extractedIdFields.cic.replace(/\D/g, ''), 9),
+        ocr: cap(extractedIdFields.ocr.replace(/\D/g, ''), 13),
       };
 
       const pdfParams = {
@@ -831,12 +860,15 @@ const ClientFaceRecognitionPage: React.FC = () => {
         curp: idf.curp,
         claveElector: idf.claveElector,
         fechaNacimiento: idf.fechaNacimiento,
+        cic: idf.cic,
+        ocr: idf.ocr,
         contractAccepted: true,
         contractPdfBase64: generateContractPdfBase64(pdfParams),
         contractAcceptedAt: now,
         pagareAccepted: true,
         pagarePdfBase64: generatePagarePdfBase64({ ...pdfParams, hasPhysicalPagare }),
         hasPhysicalPagare,
+        resguardoPdfBase64: generateResguardoPdfBase64({ ...pdfParams, hasPhysicalPagare }),
         idSignatureCropBase64: idSignatureCropBase64 ? idSignatureCropBase64.split(',')[1] : undefined,
         contractSignatureBase64: contractSignatureBase64.split(',')[1],
         userId: 0,
@@ -859,20 +891,45 @@ const ClientFaceRecognitionPage: React.FC = () => {
         setToastMessage(`Error al enviar el contrato: ${response.msg || ''}`);
         setShowToast(true);
       } else {
-        setToastMessage('¡Contrato aceptado y enviado exitosamente!');
-        setShowToast(true);
-        if (continueToPayments) {
-          console.log('[Expediente] handleSubmitContract: SUCCESS — advancing to payment step');
-          setStep(5);
+        const finish = () => {
+          if (continueToPayments) {
+            console.log('[Expediente] handleSubmitContract: SUCCESS — advancing to payment step');
+            setStep(6);
+          } else {
+            // Hand back to whoever opened the wizard rather than resetWizard(),
+            // which sets step 0 and left the client staring at "Cliente y
+            // documento" again — indistinguishable from the submit having
+            // failed. There is no payout step for borrowers any more (that is
+            // deferred to disbursement), so the contract IS the last step.
+            console.log('[Expediente] handleSubmitContract: SUCCESS — expediente complete, returning to', returnTo);
+            resetWizard();
+            history.push(returnTo);
+          }
+        };
+        // The three signed PDFs now live in Azure: offer to open each before moving on.
+        const saved = [
+          { label: 'Ver contrato', url: response.contractPdfBlobUrl },
+          { label: 'Ver pagaré', url: response.pagarePdfBlobUrl },
+          { label: 'Ver constancia de resguardo', url: response.resguardoPdfBlobUrl },
+        ].filter((d): d is { label: string; url: string } => !!d.url);
+        if (saved.length === 0) {
+          setToastMessage('¡Contrato aceptado y enviado exitosamente!');
+          setShowToast(true);
+          finish();
         } else {
-          // Hand back to whoever opened the wizard rather than resetWizard(),
-          // which sets step 0 and left the client staring at "Cliente y
-          // documento" again — indistinguishable from the submit having
-          // failed. There is no payout step for borrowers any more (that is
-          // deferred to disbursement), so the contract IS the last step.
-          console.log('[Expediente] handleSubmitContract: SUCCESS — expediente complete, returning to', returnTo);
-          resetWizard();
-          history.push(returnTo);
+          presentAlert({
+            header: 'Documentos firmados',
+            message: 'Tu contrato, pagaré y constancia se guardaron. También los encuentras en tu expediente digital.',
+            backdropDismiss: false,
+            buttons: [
+              ...saved.map(d => ({
+                text: d.label,
+                // Keep the alert open so the other documents stay one tap away.
+                handler: () => { window.open(d.url, '_blank', 'noopener,noreferrer'); return false; },
+              })),
+              { text: 'Continuar', role: 'confirm', handler: () => { finish(); } },
+            ],
+          });
         }
       }
     } catch (err) {
@@ -891,6 +948,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
           <div className="wizard-step-item">
             <button
               className={`wizard-step-circle${i === step ? ' active' : ''}${i < step ? ' completed' : ''}`}
+              // 6–7 steps overflow a phone's width: keep the current one in view.
+              ref={i === step ? (el) => el?.scrollIntoView({ inline: 'center', block: 'nearest' }) : undefined}
               onClick={() => jump(i)}
               style={{ cursor: (!contractAccepted && i < step) ? 'pointer' : 'default', border: 'none' }}
             >
@@ -1044,7 +1103,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
       return null;
     }
 
-    if (step === 5) {
+    if (step === 6) {
       // Payment — the embedded Stripe form / card setup drives its own
       // completion, there's nothing to submit/go-back to here.
       return null;
@@ -1072,12 +1131,18 @@ const ClientFaceRecognitionPage: React.FC = () => {
           </button>
         )}
         {step === 3 && (
-          // Terms accepted here; signing happens on the next step (Firma).
-          <button className="wizard-footer-next" onClick={() => setStep(4)} disabled={!contractAccepted || !pagareAccepted}>
+          // Datos reviewed (fields stay editable); the documents come next.
+          <button className="wizard-footer-next" onClick={() => setStep(4)}>
             Continuar <IonIcon icon={chevronForward} />
           </button>
         )}
         {step === 4 && (
+          // Terms accepted here; signing happens on the next step (Firma).
+          <button className="wizard-footer-next" onClick={() => setStep(5)} disabled={!contractAccepted || !pagareAccepted}>
+            Continuar <IonIcon icon={chevronForward} />
+          </button>
+        )}
+        {step === 5 && (
           // Firma — the actual submission, now that the signature exists.
           <button className="wizard-footer-submit" onClick={handleSubmitContract} disabled={!contractAccepted || !pagareAccepted || !contractSignatureBase64 || loading}>
             Enviar contrato
@@ -1434,40 +1499,72 @@ const ClientFaceRecognitionPage: React.FC = () => {
               <p><strong>Documento:</strong> {documentType || '—'}</p>
               <p><strong>Coincidencia facial:</strong> {isVerified ? `Verificada ✓ (${(confidenceScore * 100).toFixed(1)}%)` : 'No verificada'}</p>
               <p><strong>Liveness:</strong> {livenessStatus}</p>
+              <p><strong>Presencia registrada:</strong> {presenceResult ? 'Sí ✓' : 'No'}</p>
             </div>
           </IonCardContent>
         </IonCard>
       );
     }
 
+    // step === 3 — Datos: review what was read from the INE. These values go
+    // into the three documents, so they are checked before the contract step.
     if (step === 3) return (
       <IonCard className="client-face-recognition-step-card">
         <IonCardHeader>
-          <IonCardTitle>Paso 4: Aceptación de Contrato</IonCardTitle>
+          <IonCardTitle>Paso 4: Tus datos</IonCardTitle>
         </IonCardHeader>
         <IonCardContent>
-          <p>Revisa el resumen, acepta términos y envía la solicitud.</p>
-
-          <div className="ion-margin-vertical">
-            <p><strong>Cliente:</strong> {selectedClient ? `${selectedClient.first_name} ${selectedClient.last_name}` : '—'}</p>
-            <p><strong>Documento:</strong> {documentType || '—'}</p>
-            <p><strong>Puntaje de confianza:</strong> {confidenceScore > 0 ? confidenceScore.toFixed(4) : '—'}</p>
-            <p><strong>Estado:</strong> {isVerified ? 'Verificado ✓' : 'No verificado'}</p>
-            <p><strong>Presencia registrada:</strong> {presenceResult ? 'Sí ✓' : 'No'}</p>
-            <p><strong>Contrato aceptado en:</strong> {contractAcceptedAt || 'Pendiente de envío'}</p>
-          </div>
-
+          <p>Revisa los datos leídos de tu identificación. Aparecerán en tu contrato y pagaré.</p>
           <IdExtractedFieldsSummary
             fields={extractedIdFields}
             onFieldsChange={setExtractedIdFields}
             ocrLoading={ocrLoading}
             ocrError={ocrError}
           />
+        </IonCardContent>
+      </IonCard>
+    );
+
+    if (step === 4) return (
+      <IonCard className="client-face-recognition-step-card">
+        <IonCardHeader>
+          <IonCardTitle>Paso 5: Contrato</IonCardTitle>
+        </IonCardHeader>
+        <IonCardContent>
+          <p>Lee y acepta los documentos. Los firmarás en el siguiente paso.</p>
 
           <IonContent className="contract-terms-content ion-padding" scrollY={true}>
             <p><strong>Términos y Condiciones del Contrato:</strong></p>
             <p>Al marcar la siguiente casilla, reconoces que has leído, entendido y aceptas todos los términos y condiciones de este contrato.</p>
           </IonContent>
+
+          <IonList lines="none" className="ion-margin-top">
+            <IonListHeader>Lee los documentos antes de aceptarlos</IonListHeader>
+            {KYC_DOCUMENTS.map(d => (
+              <IonItem key={d.id} button detail onClick={() => setReadingDoc(d.id)}>
+                <IonIcon icon={documentTextOutline} slot="start" />
+                <IonLabel>{d.title}</IonLabel>
+              </IonItem>
+            ))}
+          </IonList>
+
+          <IonModal isOpen={!!readingDoc} onDidDismiss={() => setReadingDoc(null)}>
+            <IonHeader>
+              <IonToolbar>
+                <IonTitle>{KYC_DOCUMENTS.find(d => d.id === readingDoc)?.title}</IonTitle>
+                <IonButtons slot="end">
+                  <IonButton onClick={() => setReadingDoc(null)} aria-label="Cerrar">
+                    <IonIcon icon={close} slot="icon-only" />
+                  </IonButton>
+                </IonButtons>
+              </IonToolbar>
+            </IonHeader>
+            <IonContent className="ion-padding">
+              <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                {KYC_DOCUMENTS.find(d => d.id === readingDoc)?.text}
+              </p>
+            </IonContent>
+          </IonModal>
 
           <IonItem>
             <IonLabel>Acepto los términos del contrato de crédito</IonLabel>
@@ -1497,14 +1594,14 @@ const ClientFaceRecognitionPage: React.FC = () => {
       </IonCard>
     );
 
-    // step === 4 — Firma. Split out of the Contrato step so signing is its own
+    // step === 5 — Firma. Split out of the Contrato step so signing is its own
     // deliberate action after the client has accepted the terms. This is where
     // the contract is actually submitted, because the generated PDF embeds the
     // signature drawn here.
-    if (step === 4) return (
+    if (step === 5) return (
       <IonCard className="client-face-recognition-step-card">
         <IonCardHeader>
-          <IonCardTitle>Paso 5: Firma</IonCardTitle>
+          <IonCardTitle>Paso 6: Firma</IonCardTitle>
         </IonCardHeader>
         <IonCardContent>
           <p>Firma para validar tu identidad y enviar el contrato y el pagaré.</p>
@@ -1520,7 +1617,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
       </IonCard>
     );
 
-    // step === 5 — the payment step, reached after a successful contract
+    // step === 6 — the payment step, reached after a successful contract
     // submission. Borrowers register a repayment card; lenders onboard a native
     // Custom connected account (payout destination). Both on the single POS GMO
     // platform account — the lender path needs the one-time Connect
@@ -1531,7 +1628,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
         return (
           <IonCard className="client-face-recognition-step-card">
             <IonCardHeader>
-              <IonCardTitle>Paso 5: Tarjeta para cobros automáticos</IonCardTitle>
+              <IonCardTitle>Paso 7: Tarjeta para cobros automáticos</IonCardTitle>
             </IonCardHeader>
             <IonCardContent>
               <p>Registra la tarjeta con la que se cobrarán automáticamente las cuotas de tu préstamo cada mes.</p>
@@ -1556,7 +1653,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
       return (
         <IonCard className="client-face-recognition-step-card">
           <IonCardHeader>
-            <IonCardTitle>Paso 5: Cuenta de pago</IonCardTitle>
+            <IonCardTitle>Paso 7: Cuenta de pago</IonCardTitle>
           </IonCardHeader>
           <IonCardContent>
             <p>Registra tu cuenta bancaria o tarjeta de débito para recibir pagos.</p>

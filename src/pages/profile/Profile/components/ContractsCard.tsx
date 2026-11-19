@@ -64,6 +64,32 @@ const ContractsCard: React.FC<{ vm: ProfileVM }> = ({ vm }) => {
               )}
             </div>
 
+            {vm.faceRecord?.pagarePdfBlobUrl && (
+              <div className="profile-info-row">
+                <span className="profile-row-icon profile-icon-teal-soft"><IonIcon icon={documentTextOutline} /></span>
+                <div className="profile-row-text">
+                  <span>Pagaré</span>
+                  <strong>{vm.faceRecord.contractAcceptedAt ? `Firmado el ${mxDate(vm.faceRecord.contractAcceptedAt)}` : 'Firmado'}</strong>
+                </div>
+                <a href={vm.faceRecord.pagarePdfBlobUrl} target="_blank" rel="noreferrer" className="profile-pdf-link" aria-label="Abrir Pagaré">
+                  <IonIcon icon={openOutline} />
+                </a>
+              </div>
+            )}
+
+            {vm.faceRecord?.resguardoPdfBlobUrl && (
+              <div className="profile-info-row">
+                <span className="profile-row-icon profile-icon-teal-soft"><IonIcon icon={documentTextOutline} /></span>
+                <div className="profile-row-text">
+                  <span>Constancia de resguardo del pagaré</span>
+                  <strong>{vm.faceRecord.contractAcceptedAt ? `Firmado el ${mxDate(vm.faceRecord.contractAcceptedAt)}` : 'Firmado'}</strong>
+                </div>
+                <a href={vm.faceRecord.resguardoPdfBlobUrl} target="_blank" rel="noreferrer" className="profile-pdf-link" aria-label="Abrir Constancia de resguardo del pagaré">
+                  <IonIcon icon={openOutline} />
+                </a>
+              </div>
+            )}
+
             {vm.contracts.length > 0 && (
               <div className="profile-loan-contracts">
                 <p className="profile-loan-contracts-title">Contratos por préstamo</p>

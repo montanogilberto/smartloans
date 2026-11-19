@@ -24,6 +24,10 @@ export interface ExtractedIdFields {
   curp: string;
   claveElector: string;
   fechaNacimiento: string;
+  /** RFC-015: from the BACK's machine-readable zone — 9 digits, or ''. */
+  cic: string;
+  /** RFC-015: 13 digits after '<<' on the first MRZ line, or ''. */
+  ocr: string;
 }
 
 export interface IdExtractionResult {
@@ -37,6 +41,8 @@ const EMPTY_FIELDS: ExtractedIdFields = {
   curp: '',
   claveElector: '',
   fechaNacimiento: '',
+  cic: '',
+  ocr: '',
 };
 
 const EMPTY_RESULT: IdExtractionResult = {
@@ -85,8 +91,6 @@ export async function extractIneFields(input: IdExtractionInput): Promise<IdExtr
     endpoint: `${AGENT_BASE}/extract-id-fields`,
     front: usingFront,
     back: usingBack,
-    frontUrl: payload.imageFrontUrl ?? '(none)',
-    backUrl: payload.imageBackUrl ?? '(none)',
     frontBase64Length: payload.imageFrontBase64?.length ?? 0,
     backBase64Length: payload.imageBackBase64?.length ?? 0,
     payloadKeys: Object.keys(payload),
@@ -132,13 +136,9 @@ export async function extractIneFields(input: IdExtractionInput): Promise<IdExtr
     // Per-field breakdown — the useful signal when a client reports "it only
     // filled in some of my data": shows exactly which fields came back empty
     // (not legible) vs. flagged (read, but verify).
+    // Presence only — the values are personal data and never go to the logs.
     console.log('[IdOcr] extractIneFields: RESULT', JSON.stringify({
       elapsedMs,
-      nombre: fields.nombre || '(empty)',
-      domicilio: fields.domicilio || '(empty)',
-      curp: fields.curp || '(empty)',
-      claveElector: fields.claveElector || '(empty)',
-      fechaNacimiento: fields.fechaNacimiento || '(empty)',
       lowConfidenceFields,
       emptyFields: (Object.keys(fields) as Array<keyof ExtractedIdFields>).filter((k) => !fields[k]),
     }));
