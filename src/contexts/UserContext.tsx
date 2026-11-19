@@ -1,0 +1,281 @@
+import React, { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
+import { RoleCode, normalizeRoleCode, loadRoleCatalog } from '../config/rolePermissions';
+import { DEFAULT_AVATAR_URL } from '../utils/formatters';
+import { ClientType } from '../api/clientsApi';
+import { listClientCapabilities } from '../api/clientCapabilitiesApi';
+import { getOneCompany } from '../api/companiesApi';
+import { ProductContext, availableProducts, defaultProduct } from '../utils/productContext';
+import { SESSION_EXPIRED_EVENT, clearSessionTokens } from '../utils/sessionTokens';
+
+// ── Storage key ────────────────────────────────────────────────────────────
+export const STORAGE_KEY = 'pos_gmo_auth';
+
+// ── Types ──────────────────────────────────────────────────────────────────
+export interface AuthData {
+  isAuthenticated: boolean;
+  userId: number;
+  username: string;
+  avatarUrl: string;
+  companyId: number;
+  companyName: string;
+  branchId: number;
+  branchName: string;
+  clientId: number;
+  clientType?: ClientType;
+  /** The 1:N clientTypes concept (POS/SMARTLOANS_LENDER/SMARTLOANS_BORROWER/
+   * SMARTLOANS_JURIDICAL/REWARDS/ARCADE) — a client can hold several at
+   * once. Independent of clientType (above, a legacy single-value label)
+   * and of roleCode (below, staff operational permissions). Fetched
+   * automatically whenever companyId+clientId are known — see the effect
+   * in UserProvider — not set directly by login(). */
+  clientCapabilities: string[];
+  /** `${companyId}:${clientId}` the capabilities above were loaded for — a
+   * mismatch means they belong to another company/client and are dropped. */
+  clientCapabilitiesKey?: string;
+  roleCode: RoleCode;
+  roleName: string;
+  /** Product the user last switched to (self-service sessions only). */
+  activeProduct?: ProductContext | null;
+}
+
+interface UserContextProps extends AuthData {
+  /** Legacy setters kept for backward compatibility */
+  setUsername: (username: string) => void;
+  setAvatarUrl: (url: string) => void;
+  /** Set user data after credentials validated (before company selection) */
+  setUserData: (data: Partial<AuthData>) => void;
+  /** Finalise login with all data — sets isAuthenticated = true & persists */
+  login: (data: Partial<AuthData>) => void;
+  /** Clear session */
+  logout: () => void;
+  /** Products this session can switch between — empty for staff. */
+  availableProducts: ProductContext[];
+  /** Effective product context (stored choice if still held, else the
+   * role's default). Null for staff sessions. Shadows AuthData.activeProduct. */
+  activeProduct: ProductContext | null;
+  setActiveProduct: (product: ProductContext) => void;
+  /** Re-read clientCapabilities after a grant/revoke (e.g. self-enrollment). */
+  refreshCapabilities: () => Promise<string[]>;
+}
+
+// ── Defaults ───────────────────────────────────────────────────────────────
+const DEFAULT_AUTH: AuthData = {
+  isAuthenticated: false,
+  userId: 0,
+  username: '',
+  avatarUrl: DEFAULT_AVATAR_URL,
+  companyId: 0,
+  companyName: '',
+  branchId: 0,
+  branchName: '',
+  clientId: 0,
+  clientCapabilities: [],
+  roleCode: 'employee',
+  roleName: 'Empleado',
+};
+
+// ── localStorage helpers ───────────────────────────────────────────────────
+const loadStoredAuth = (): AuthData => {
+  console.log("🔵 UserContext: Loading stored auth from localStorage");
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    console.log("[UserContext] loadStoredAuth: raw =", raw);
+    if (!raw) return DEFAULT_AUTH;
+    const parsed = JSON.parse(raw) as Partial<AuthData>;
+    const result = {
+      ...DEFAULT_AUTH,
+      ...parsed,
+      roleCode: normalizeRoleCode(parsed.roleCode),
+    };
+    console.log("[UserContext] loadStoredAuth: resulting isAuthenticated =", result.isAuthenticated);
+    return result;
+  } catch (err) {
+    console.log("[UserContext] loadStoredAuth: parse error, defaulting to logged-out =", err);
+    return DEFAULT_AUTH;
+  }
+};
+
+const persistAuth = (data: AuthData) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    /* ignore quota errors */
+  }
+};
+
+// ── Context ────────────────────────────────────────────────────────────────
+const UserContext = createContext<UserContextProps | undefined>(undefined);
+
+export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [auth, setAuth] = useState<AuthData>(loadStoredAuth);
+
+  // Fetch the DB-backed role catalog once per app session, before most
+  // screens read ROLE_LABELS/ROLE_UI/ROLE_GROUPS. Failure just keeps the
+  // hardcoded defaults in config/rolePermissions.ts (see loadRoleCatalog).
+  useEffect(() => {
+    loadRoleCatalog();
+  }, []);
+
+  useEffect(() => {
+    const onExpired = () => logout();
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+  }, []);
+
+  // clientCapabilities isn't part of what login()/setUserData get handed
+  // directly (none of /login, /client-login's verify response, or
+  // CreateAccount's flow return it) — fetched here instead, once per
+  // companyId+clientId pair, so every entry point picks it up uniformly
+  // rather than needing each login path to remember to fetch it itself.
+  useEffect(() => {
+    if (!auth.isAuthenticated || !auth.companyId || !auth.clientId) return;
+    const key = `${auth.companyId}:${auth.clientId}`;
+    // Never keep another company's/client's capabilities while (or if) the
+    // fetch below fails — capability checks must use the current companyId.
+    if (auth.clientCapabilitiesKey !== key && auth.clientCapabilities.length > 0) {
+      setAuth(prev => {
+        const next = { ...prev, clientCapabilities: [], clientCapabilitiesKey: key };
+        persistAuth(next);
+        return next;
+      });
+    }
+    let cancelled = false;
+    listClientCapabilities(auth.companyId, auth.clientId)
+      .then(rows => {
+        if (cancelled) return;
+        const active = rows.filter(r => r.isActive).map(r => r.capability);
+        console.log('[UserContext] fetched clientCapabilities for clientId=%d: %o', auth.clientId, active);
+        setAuth(prev => {
+          const next = { ...prev, clientCapabilities: active, clientCapabilitiesKey: key };
+          persistAuth(next);
+          return next;
+        });
+      })
+      .catch(err => console.warn('[UserContext] listClientCapabilities failed:', err));
+    return () => { cancelled = true; };
+  }, [auth.isAuthenticated, auth.companyId, auth.clientId]);
+
+  // Every login path starts without companies.name (staff auto-confirm their
+  // default company, phone logins have no selector), so it is resolved once here.
+  useEffect(() => {
+    if (!auth.isAuthenticated || !auth.companyId || auth.companyName) return;
+    let cancelled = false;
+    getOneCompany(auth.companyId)
+      .then(company => {
+        if (cancelled || !company?.name) return;
+        setAuth(prev => {
+          const next = { ...prev, companyName: company.name };
+          persistAuth(next);
+          return next;
+        });
+      })
+      .catch(err => console.warn('[UserContext] company name failed:', err));
+    return () => { cancelled = true; };
+  }, [auth.isAuthenticated, auth.companyId, auth.companyName]);
+
+  const refreshCapabilities = async (): Promise<string[]> => {
+    if (!auth.companyId || !auth.clientId) return [];
+    const key = `${auth.companyId}:${auth.clientId}`;
+    const rows = await listClientCapabilities(auth.companyId, auth.clientId);
+    const active = rows.filter(r => r.isActive).map(r => r.capability);
+    console.log('[UserContext] refreshCapabilities for clientId=%d: %o', auth.clientId, active);
+    setAuth(prev => {
+      const next = { ...prev, clientCapabilities: active, clientCapabilitiesKey: key };
+      persistAuth(next);
+      return next;
+    });
+    return active;
+  };
+
+  const saveAuth = (data: AuthData) => {
+    setAuth(data);
+    persistAuth(data);
+  };
+
+  /** Partial update — does NOT set isAuthenticated */
+  const setUserData = (data: Partial<AuthData>) => {
+    setAuth((prev) => ({ ...prev, ...data }));
+  };
+
+  /** Full login — merges data and marks session as authenticated */
+  const login = (data: Partial<AuthData>) => {
+    console.log("🟢 UserContext LOGIN SUCCESS:", { ...auth, ...data, isAuthenticated: true });
+    const next: AuthData = {
+      ...auth,
+      ...data,
+      roleCode: normalizeRoleCode(data.roleCode ?? auth.roleCode),
+      isAuthenticated: true,
+    };
+    saveAuth(next);
+    // Re-read the DB role catalog: features granted since the page loaded
+    // (new modules, /setting edits) must appear without a full reload.
+    void loadRoleCatalog();
+  };
+
+  /** Logout — clears everything */
+  const logout = () => {
+    console.log("🔴 UserContext LOGOUT called. isAuthenticated will become false");
+    localStorage.removeItem(STORAGE_KEY);
+    clearSessionTokens();
+    setAuth(DEFAULT_AUTH);
+  };
+
+  const products = useMemo(
+    () => (auth.isAuthenticated ? availableProducts(auth.roleCode, auth.clientCapabilities) : []),
+    [auth.isAuthenticated, auth.roleCode, auth.clientCapabilities],
+  );
+  const effectiveProduct: ProductContext | null =
+    auth.activeProduct && products.includes(auth.activeProduct)
+      ? auth.activeProduct
+      : defaultProduct(auth.roleCode, products);
+
+  const setActiveProduct = (activeProduct: ProductContext) => {
+    setAuth((prev) => {
+      const next = { ...prev, activeProduct };
+      persistAuth(next);
+      return next;
+    });
+  };
+
+  // Legacy setters (functional updates avoid stale auth in async flows)
+  const setUsername = (username: string) => {
+    setAuth((prev) => {
+      const next = { ...prev, username };
+      persistAuth(next);
+      return next;
+    });
+  };
+
+  const setAvatarUrl = (avatarUrl: string) => {
+    setAuth((prev) => {
+      const next = { ...prev, avatarUrl };
+      persistAuth(next);
+      return next;
+    });
+  };
+
+  return (
+    <UserContext.Provider
+      value={{
+        ...auth,
+        setUsername,
+        setAvatarUrl,
+        setUserData,
+        login,
+        logout,
+        availableProducts: products,
+        activeProduct: effectiveProduct,
+        setActiveProduct,
+        refreshCapabilities,
+      }}
+    >
+      {children}
+    </UserContext.Provider>
+  );
+};
+
+export const useUser = (): UserContextProps => {
+  const ctx = useContext(UserContext);
+  if (!ctx) throw new Error('useUser must be used within a UserProvider');
+  return ctx;
+};

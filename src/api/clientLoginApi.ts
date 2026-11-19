@@ -1,0 +1,137 @@
+import { API_BASE_URL } from './usersApi';
+import { SessionTokens, saveSessionTokens } from '../utils/sessionTokens';
+
+/** The channel that carried the login code: the GMO app (push), WhatsApp or SMS. */
+export type CodeChannel = 'push' | 'sms' | 'whatsapp';
+
+/**
+ * What the app asks for. 'auto' (first send, "Olvidé mi PIN"): the backend tries
+ * the app (push) → WhatsApp → SMS. 'sms' / 'whatsapp': the client picked one on
+ * the code step. WhatsApp falls back to SMS server side when it can't be sent.
+ */
+export type CodeRequestChannel = 'auto' | 'sms' | 'whatsapp';
+
+/** Digits of a code from a backend that doesn't send codeLength yet (before RFC-013). */
+export const LEGACY_CODE_LENGTH = 6;
+
+export interface SendClientLoginCodeResult {
+  found: boolean;
+  /** The channel that actually carried the code (absent when none was sent). */
+  channel?: CodeChannel;
+  /** Digits in the code that was sent (RFC-013: 4). Absent on older backends → LEGACY_CODE_LENGTH. */
+  codeLength?: number;
+  message?: string;
+  error?: string;
+  // true once this client finished password onboarding on a previous
+  // login -- no SMS was sent this time, show the password field instead.
+  firstLoginCompleted?: boolean;
+  /** The client matched by the phone, for the "Bienvenido de nuevo, …" greeting (optional until the backend sends it). */
+  clientId?: number | string;
+  firstName?: string;
+  lastName?: string;
+}
+
+export interface VerifyClientLoginCodeResult {
+  valid: boolean;
+  userId?: number | string;
+  companyId?: number | string;
+  clientId?: number | string;
+  roleCode?: string;
+  roleName?: string;
+  firstName?: string;
+  lastName?: string;
+  error?: string;
+  firstLoginCompleted?: boolean;
+  session?: SessionTokens;
+  /** Proves the code was verified; /set_client_password needs it. */
+  pinToken?: string;
+}
+
+export interface SetClientPasswordResult {
+  success: boolean;
+  error?: string;
+}
+
+export interface VerifyClientPasswordResult {
+  session?: SessionTokens;
+  valid: boolean;
+  userId?: number | string;
+  companyId?: number | string;
+  clientId?: number | string;
+  roleCode?: string;
+  roleName?: string;
+  firstName?: string;
+  lastName?: string;
+  error?: string;
+}
+
+/**
+ * POST /send_client_login_code — sends a 6-digit OTP (SMS or WhatsApp) to a registered POS client.
+ * `resetPin` ("Olvidé mi PIN") sends it even when the client already has a PIN.
+ */
+export const sendClientLoginCode = async (
+  phone: string,
+  { resetPin = false, channel = 'auto' }: { resetPin?: boolean; channel?: CodeRequestChannel } = {},
+): Promise<SendClientLoginCodeResult> => {
+  console.log('[sendClientLoginCode] resetPin=%s channel=%s', resetPin, channel);
+  const res = await fetch(`${API_BASE_URL}/send_client_login_code`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clientLoginCodes: [{ phone, resetPin, channel }] }),
+  });
+  const data = await res.json();
+  console.log('[sendClientLoginCode] RESPONSE status=%d', res.status, data);
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  return data;
+};
+
+/** POST /verify_client_login_code — validates the OTP and returns the login payload. */
+export const verifyClientLoginCode = async (phone: string, code: string): Promise<VerifyClientLoginCodeResult> => {
+  const res = await fetch(`${API_BASE_URL}/verify_client_login_code`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clientLoginCodes: [{ phone, code }] }),
+  });
+  const data = await res.json();
+  console.log('[verifyClientLoginCode] RESPONSE status=%d', res.status);
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  const { session, ...result } = data;
+  saveSessionTokens(session);
+  return result;
+};
+
+/** POST /set_client_password — first-login onboarding: client sets a password. */
+export const setClientPassword = async (
+  userId: number | string,
+  password: string,
+  pinToken?: string,
+): Promise<SetClientPasswordResult> => {
+  console.log('[setClientPassword] userId=', userId);
+  const res = await fetch(`${API_BASE_URL}/set_client_password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ setClientPassword: [{ userId, password, pinToken }] }),
+  });
+  const data = await res.json();
+  console.log('[setClientPassword] RESPONSE status=%d', res.status, data);
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  return data;
+};
+
+/** POST /verify_client_password — returning-client login: phone+password, no OTP. */
+export const verifyClientPassword = async (
+  phone: string,
+  password: string,
+): Promise<VerifyClientPasswordResult> => {
+  const res = await fetch(`${API_BASE_URL}/verify_client_password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clientPasswordLogin: [{ phone, password }] }),
+  });
+  const data = await res.json();
+  console.log('[verifyClientPassword] RESPONSE status=%d', res.status);
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  const { session, ...result } = data;
+  saveSessionTokens(session);
+  return result;
+};

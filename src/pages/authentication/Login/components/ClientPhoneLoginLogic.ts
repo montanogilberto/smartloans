@@ -1,0 +1,366 @@
+import { useEffect, useRef, useState } from 'react';
+import { useHistory } from 'react-router-dom';
+import { useUser } from '../../../../contexts/UserContext';
+import { useToast } from '../../../../hooks/useToast';
+import {
+  sendClientLoginCode, verifyClientLoginCode, setClientPassword, verifyClientPassword, CodeChannel,
+  CodeRequestChannel, LEGACY_CODE_LENGTH,
+} from '../../../../api/clientLoginApi';
+import { normalizeRoleCode } from '../../../../config/rolePermissions';
+import { appDestination, LoginApp } from '../../../../utils/loginApps';
+import { DEFAULT_AVATAR_URL } from '../../../../utils/formatters';
+import {
+  isBiometricAvailable, isBiometricLockEnabled, setBiometricLockEnabled, authenticateBiometric,
+  getSavedClientPhone, saveClientPhone, clearSavedClientPhone,
+} from '../../../../utils/biometricAuth';
+import { Country, DEFAULT_COUNTRY, isValidNational, toE164 } from '../../../../utils/phone';
+import { pinProblem } from '../../../../utils/pin';
+import type { PinInputHandle } from '../../../../components/ui/PinInput';
+
+// 'quick': this device already has a remembered number + biometric lock —
+//   "Continuar como +52 662...4567" instead of retyping the phone.
+// 'code': SMS step, reached on a client's first login or from "Olvidé mi PIN"
+//   (resettingPin), which then leads to 'set-pin' to replace the old PIN.
+// 'set-pin': mandatory right after that first SMS verification — the 4-digit
+//   PIN created here replaces the SMS on every later login.
+// 'pin': what a returning client (firstLoginCompleted) sees instead of 'code'.
+//   Accounts created before PINs existed keep working with their old password
+//   ('legacy' toggle), so nobody is locked out.
+// 'biometric': offered once per device right after the PIN.
+export type ClientPhoneStep = 'quick' | 'phone' | 'code' | 'set-pin' | 'pin' | 'biometric';
+
+interface PendingLogin {
+  pinToken?: string;
+  userId: number;
+  username: string;
+  companyId: number;
+  clientId: number;
+  roleCode: ReturnType<typeof normalizeRoleCode>;
+  roleName: string;
+}
+
+/** "por SMS" / "por WhatsApp" / "a tu app GMO" — where the code went, for toasts and the code step. */
+export const channelPhrase = (channel: CodeChannel): string =>
+  channel === 'push' ? 'a tu app GMO' : channel === 'whatsapp' ? 'por WhatsApp' : 'por SMS';
+
+// clientId 1 is each company's generic walk-in record ("Desconocido"), never a person.
+const WALK_IN_CLIENT_ID = 1;
+
+const greetingName = (r: { clientId?: number | string; firstName?: string; lastName?: string }) => {
+  if (Number(r.clientId) === WALK_IN_CLIENT_ID) return '';
+  return `${r.firstName ?? ''} ${r.lastName ?? ''}`.trim();
+};
+
+/** Phone → (SMS code → PIN) → (biometric) sign-in for customers, shared by /client-login and the Arcade / Rewards login. */
+export const useClientPhoneLogin = (app: LoginApp) => {
+  const history = useHistory();
+  const { login } = useUser();
+
+  // The code step's boxes: as many as the backend says the code has (RFC-013: 4).
+  const [code, setCode] = useState('');
+  const [codeLength, setCodeLength] = useState(LEGACY_CODE_LENGTH);
+  const pinRef = useRef<string>('');
+  // The 4-box PIN fields are controlled (the submit button waits for 4 digits).
+  const [pin, setPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const pinInputRef = useRef<PinInputHandle>(null);
+  const confirmPinInputRef = useRef<PinInputHandle>(null);
+  // The verified login payload waits here while we ask about PIN/biometric —
+  // login()/navigation only fire once those steps resolve (set or skip).
+  const pendingLoginRef = useRef<PendingLogin | null>(null);
+
+  const [step, setStep] = useState<ClientPhoneStep>('phone');
+  const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
+  const [national, setNational] = useState('');
+  const [phone, setPhone] = useState('');
+  // Full name of the client matched by the phone (empty → greet with the masked phone).
+  const [clientName, setClientName] = useState('');
+  const [savedPhone, setSavedPhone] = useState<string | null>(null);
+  const [legacyPassword, setLegacyPassword] = useState(false);
+  const [resettingPin, setResettingPin] = useState(false);
+  const [codeChannel, setCodeChannel] = useState<CodeChannel>('sms');
+  const [loading, setLoading] = useState(false);
+  // Shared toast (top, red by default); a resend confirmation passes 'success'.
+  const { showToast, toastProps } = useToast({ defaultColor: 'danger' });
+  const codeInputRef = useRef<PinInputHandle>(null);
+
+  // Quick-login is only offered when this device already proved it's the
+  // client's own (biometric on) AND has a remembered number.
+  useEffect(() => {
+    (async () => {
+      const [available, enabled, remembered] = await Promise.all([
+        isBiometricAvailable(), isBiometricLockEnabled(), getSavedClientPhone(),
+      ]);
+      if (available && enabled && remembered) {
+        setSavedPhone(remembered);
+        setStep('quick');
+      }
+    })();
+  }, []);
+
+  const sendCodeFor = async (value: string) => {
+    setLoading(true);
+    try {
+      const result = await sendClientLoginCode(value);
+      if (!result.found) {
+        // A remembered number that no longer resolves to an account must not keep being offered.
+        await clearSavedClientPhone();
+        showToast('No encontramos ese número. Pide a un empleado que te registre.');
+        setStep('phone');
+        return;
+      }
+      setPhone(value);
+      setClientName(greetingName(result));
+      setLegacyPassword(false);
+      setResettingPin(false);
+      setPin('');
+      setCodeChannel(result.channel ?? 'sms');
+      setCodeLength(result.codeLength ?? LEGACY_CODE_LENGTH);
+      setCode('');
+      // Onboarding already done: no SMS was sent this time, ask for the PIN.
+      setStep(result.firstLoginCompleted ? 'pin' : 'code');
+    } catch (err) {
+      showToast(`No se pudo enviar el código: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitPhone = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isValidNational(country, national)) {
+      showToast(`Ingresa los ${country.nationalLength} dígitos de tu número`);
+      return;
+    }
+    await sendCodeFor(toE164(country, national));
+  };
+
+  const quickContinue = async () => {
+    if (!savedPhone) return;
+    setLoading(true);
+    try {
+      const confirmed = await authenticateBiometric('Confirma tu identidad para continuar');
+      if (!confirmed) return;
+      await sendCodeFor(savedPhone);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const useAnotherNumber = () => {
+    setResettingPin(false);
+    setStep('phone');
+  };
+
+  // "Olvidé mi PIN": prove the phone again by SMS, then 'set-pin' overwrites the old PIN.
+  const forgotPin = async () => {
+    setLoading(true);
+    try {
+      const result = await sendClientLoginCode(phone, { resetPin: true });
+      const sentBy = result.channel ?? 'sms';
+      setCodeChannel(sentBy);
+      setCodeLength(result.codeLength ?? LEGACY_CODE_LENGTH);
+      setResettingPin(true);
+      setLegacyPassword(false);
+      setCode('');
+      setStep('code');
+      showToast(`Te enviamos un código ${channelPhrase(sentBy)}`, 'success');
+    } catch (err) {
+      showToast(`No se pudo enviar el código: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const completeLogin = () => {
+    const pending = pendingLoginRef.current;
+    if (!pending) return;
+    login({
+      userId: pending.userId,
+      username: pending.username,
+      avatarUrl: DEFAULT_AVATAR_URL,
+      companyId: pending.companyId,
+      companyName: '',
+      branchId: 0,
+      branchName: '',
+      clientId: pending.clientId,
+      roleCode: pending.roleCode,
+      roleName: pending.roleName,
+    });
+    history.push(appDestination(app, pending.roleCode, pending.clientId).route);
+  };
+
+  // Biometric is offered once per device: skip straight in if the hardware
+  // can't do it, or the client already has it on from a prior login.
+  const proceedToBiometricOrComplete = async () => {
+    const [available, alreadyEnabled] = await Promise.all([isBiometricAvailable(), isBiometricLockEnabled()]);
+    if (available && !alreadyEnabled) setStep('biometric');
+    else completeLogin();
+  };
+
+  // A wrong or stale code (every send/resend invalidates the previous one)
+  // must not linger in the field: clear it and refocus for the next try.
+  const resetCodeInput = () => {
+    setCode('');
+    codeInputRef.current?.focus();
+  };
+
+  const submitCode = async (e?: React.FormEvent, value: string = code) => {
+    e?.preventDefault();
+    if (loading) return;
+    if (value.length < codeLength) {
+      showToast(`Ingresa los ${codeLength} dígitos del código`);
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await verifyClientLoginCode(phone, value);
+      if (!result.valid) {
+        showToast(result.error || 'Código incorrecto');
+        resetCodeInput();
+        return;
+      }
+      pendingLoginRef.current = {
+        pinToken: result.pinToken,
+        userId: Number(result.userId) || 0,
+        username: `${result.firstName ?? ''} ${result.lastName ?? ''}`.trim() || 'Cliente',
+        companyId: Number(result.companyId) || 0,
+        clientId: Number(result.clientId) || 0,
+        roleCode: normalizeRoleCode(result.roleCode ?? 'pos'),
+        roleName: result.roleName?.trim() || 'Cliente',
+      };
+      // Mandatory right after the SMS-verified first login (or a PIN reset) — every later login skips 'code'.
+      setNewPin('');
+      setConfirmPin('');
+      setStep('set-pin');
+    } catch (err) {
+      showToast(`No se pudo verificar el código: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitNewPin = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (loading) return;
+    const pending = pendingLoginRef.current;
+    if (!pending) return;
+    const problem = pinProblem(newPin, confirmPin);
+    if (problem) {
+      showToast(problem);
+      return;
+    }
+    setLoading(true);
+    try {
+      // The PIN is stored as the account's password (4–50 chars server side): no schema change.
+      const result = await setClientPassword(pending.userId, newPin, pending.pinToken);
+      if (!result.success) {
+        showToast(result.error || 'No se pudo guardar el PIN');
+        return;
+      }
+      await proceedToBiometricOrComplete();
+    } catch (err) {
+      showToast(`No se pudo guardar el PIN: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // A wrong PIN must not linger in the boxes: clear them and refocus the first one.
+  // The boxes are disabled while verifying, so the refocus waits until loading ends.
+  const refocusPinRef = useRef(false);
+  const resetPinInput = () => {
+    setPin('');
+    refocusPinRef.current = true;
+  };
+  useEffect(() => {
+    if (loading || !refocusPinRef.current) return;
+    refocusPinRef.current = false;
+    pinInputRef.current?.focus();
+  }, [loading]);
+
+  const submitPin = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (loading) return;
+    const secret = legacyPassword ? pinRef.current.trim() : pin;
+    if (!secret) {
+      showToast(legacyPassword ? 'Ingresa tu contraseña' : 'Ingresa tu PIN');
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await verifyClientPassword(phone, secret);
+      if (!result.valid) {
+        showToast(result.error || (legacyPassword ? 'Contraseña incorrecta' : 'PIN incorrecto'));
+        if (!legacyPassword) resetPinInput();
+        return;
+      }
+      pendingLoginRef.current = {
+        userId: Number(result.userId) || 0,
+        username: `${result.firstName ?? ''} ${result.lastName ?? ''}`.trim() || 'Cliente',
+        companyId: Number(result.companyId) || 0,
+        clientId: Number(result.clientId) || 0,
+        roleCode: normalizeRoleCode(result.roleCode ?? 'pos'),
+        roleName: result.roleName?.trim() || 'Cliente',
+      };
+      await proceedToBiometricOrComplete();
+    } catch (err) {
+      showToast(`No se pudo verificar: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleLegacyPassword = () => {
+    pinRef.current = '';
+    setPin('');
+    setLegacyPassword(v => !v);
+  };
+
+  const enableBiometric = async () => {
+    setLoading(true);
+    try {
+      const confirmed = await authenticateBiometric('Confirma tu identidad para activar el bloqueo biométrico');
+      if (confirmed) {
+        await setBiometricLockEnabled(true);
+        if (phone) await saveClientPhone(phone);
+      }
+    } finally {
+      setLoading(false);
+      completeLogin();
+    }
+  };
+
+  const resendCode = async (channel: Exclude<CodeRequestChannel, 'auto'>) => {
+    setLoading(true);
+    try {
+      const result = await sendClientLoginCode(phone, { resetPin: resettingPin, channel });
+      const sentBy = result.channel ?? 'sms';
+      setCodeChannel(sentBy);
+      setCodeLength(result.codeLength ?? LEGACY_CODE_LENGTH);
+      if (channel === 'whatsapp' && sentBy === 'sms') {
+        showToast('WhatsApp no está disponible, te lo enviamos por SMS', 'warning');
+      } else {
+        showToast(sentBy === 'whatsapp' ? 'Código enviado por WhatsApp' : 'Código reenviado por SMS', 'success');
+      }
+      resetCodeInput();
+    } catch (err) {
+      showToast(`No se pudo reenviar el código: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    step, loading, toastProps,
+    country, setCountry, national, setNational, phone, savedPhone, clientName,
+    legacyPassword, toggleLegacyPassword, resettingPin, codeChannel,
+    code, setCode, codeLength, codeInputRef, pinRef,
+    pin, setPin, pinInputRef, newPin, setNewPin, confirmPin, setConfirmPin, confirmPinInputRef,
+    submitPhone, quickContinue, useAnotherNumber, submitCode, resendCode,
+    submitNewPin, submitPin, forgotPin, enableBiometric, skipBiometric: completeLogin,
+  };
+};
+
+export type ClientPhoneLoginVM = ReturnType<typeof useClientPhoneLogin>;

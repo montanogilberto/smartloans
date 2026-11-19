@@ -1,0 +1,437 @@
+/* ============================================
+   Login.css — Modern POS Login Page
+   ============================================ */
+
+.login-page-content {
+  --background: linear-gradient(160deg, #1E3A8A 0%, #2563EB 50%, #3B82F6 100%);
+}
+
+/* ── Brand / Logo ── */
+.login-brand {
+  text-align: center;
+  padding: 48px 0 32px;
+}
+
+.login-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  margin-bottom: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+}
+
+.login-logo ion-icon {
+  font-size: 32px;
+}
+
+.login-title {
+  /* Shrinks on narrow phones so long names ("Puntos/Recompensas") don't split mid-word. */
+  font-size: clamp(22px, 7.5vw, 28px);
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.5px;
+}
+
+.login-subtitle {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.75);
+  margin: 0;
+}
+
+/* ── Card ── */
+.login-card {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 28px 24px 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  margin-bottom: 24px;
+}
+
+.login-card-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 24px 0;
+  text-align: center;
+}
+
+.login-card-subtitle {
+  font-size: 13px;
+  color: #6B7280;
+  margin: -16px 0 20px 0;
+  text-align: center;
+}
+
+/* ── Form ── */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+  letter-spacing: 0.2px;
+}
+
+.login-label--icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.login-label--icon ion-icon {
+  font-size: 15px;
+  color: #6B7280;
+}
+
+.login-input {
+  --background: #F4F6F9;
+  --border-radius: 12px;
+  --padding-start: 14px;
+  --padding-end: 14px;
+  --padding-top: 12px;
+  --padding-bottom: 12px;
+  --color: #111827;
+  --placeholder-color: #9CA3AF;
+  border: 1.5px solid #E5E7EB;
+  border-radius: 12px;
+  font-size: 15px;
+  transition: border-color 0.15s;
+}
+
+.login-input.has-focus {
+  border-color: #2563EB;
+}
+
+/* ── Password wrapper ── */
+.login-password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.login-password-wrapper .login-input {
+  flex: 1;
+  --padding-end: 48px;
+}
+
+.login-eye-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9CA3AF;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  z-index: 2;
+  outline: none;
+}
+
+.login-eye-btn:hover { color: #6B7280; }
+
+/* ── Client login: password eye toggle (IonButton, shadow DOM) ── */
+.client-login-eye-btn {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  margin: 0;
+  height: 32px;
+  min-height: 32px;
+  --padding-start: 8px;
+  --padding-end: 8px;
+  --box-shadow: none;
+  --background: transparent;
+  --background-hover: transparent;
+  --background-activated: transparent;
+  --color: #9CA3AF;
+}
+
+.client-login-eye-btn:hover { --color: #6B7280; }
+
+/* ── Client login: biometric activation icon ── */
+.client-login-biometric-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 88px;
+  margin: 24px auto;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.client-login-biometric-icon ion-icon {
+  font-size: 40px;
+  color: #2563EB;
+}
+
+/* ── Biometric toggle ── */
+.login-biometric-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 4px;
+  font-size: 14px;
+  color: #374151;
+}
+
+.login-biometric-toggle ion-icon {
+  font-size: 20px;
+  color: #2563EB;
+}
+
+.login-biometric-toggle ion-label {
+  flex: 1;
+}
+
+/* ── Submit button ── */
+.login-submit-btn {
+  --background: var(--login-accent, #2563EB);
+  --background-activated: var(--login-accent-dark, #1D4ED8);
+  --background-hover: var(--login-accent-dark, #1D4ED8);
+  --border-radius: 12px;
+  --box-shadow: 0 4px 14px var(--login-accent-glow, rgba(37, 99, 235, 0.4));
+  --padding-top: 14px;
+  --padding-bottom: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 4px;
+  height: 50px;
+}
+
+/* ── Help divider + tiles (staff Login only) ── */
+.login-help-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.login-help-divider::before,
+.login-help-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #E5E7EB;
+}
+
+.login-help-divider span {
+  font-size: 12px;
+  color: #9CA3AF;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.login-help-tiles {
+  display: flex;
+  margin-top: 16px;
+}
+
+.login-help-tile {
+  flex: 1;
+  display: block;
+  text-decoration: none;
+  border-right: 1px solid #F3F4F6;
+}
+
+.login-help-tile:last-child {
+  border-right: none;
+}
+
+.login-help-tile-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  text-align: center;
+}
+
+.login-help-tile-inner ion-icon {
+  font-size: 20px;
+  color: #2563EB;
+}
+
+.login-help-tile-inner span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  line-height: 1.3;
+}
+
+.login-client-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #EFF6FF;
+  text-decoration: none;
+}
+
+.login-client-banner ion-icon:first-child {
+  font-size: 18px;
+  color: #2563EB;
+  flex-shrink: 0;
+}
+
+.login-client-banner span {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1D4ED8;
+}
+
+.login-client-banner-chevron {
+  font-size: 16px;
+  color: #2563EB;
+  flex-shrink: 0;
+}
+
+/* ── Links ── */
+.login-links {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #F3F4F6;
+}
+
+.login-links ion-router-link {
+  font-size: 13px;
+  color: #2563EB;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login-links ion-router-link:hover {
+  text-decoration: underline;
+}
+
+/* ── Responsive ── */
+@media (min-width: 480px) {
+  .login-brand { padding: 56px 0 36px; }
+  .login-card  { padding: 36px 32px 28px; }
+}
+
+
+/* ── App picker (SmartLoans · POS · Arcade · Rewards) ── */
+.login-brand {
+  padding-bottom: 20px;
+}
+
+.login-apps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 20px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.login-app-tile {
+  --color: rgba(255, 255, 255, 0.82);
+  --background: transparent;
+  --background-hover: rgba(255, 255, 255, 0.12);
+  --background-activated: rgba(255, 255, 255, 0.12);
+  --border-radius: 14px;
+  --ripple-color: transparent;
+  --padding-start: 2px;
+  --padding-end: 2px;
+  --padding-top: 8px;
+  --padding-bottom: 8px;
+  --box-shadow: none;
+  margin: 0;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.login-app-tile::part(native) {
+  transition: background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+}
+
+.login-app-tile-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Labels wrap to a 2nd line on narrow phones instead of being cut ("Recom-pensas"). */
+.login-app-tile-inner > span {
+  max-width: 100%;
+  line-height: 1.2;
+  white-space: normal;
+  text-align: center;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.login-app-tile-inner ion-icon {
+  font-size: 20px;
+}
+
+.login-app-tile--active {
+  --color: #111827;
+  --background: #ffffff;
+  --background-hover: #ffffff;
+  --background-activated: #ffffff;
+}
+
+.login-app-tile--active::part(native) {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+.login-app-tile--active ion-icon {
+  color: var(--login-accent, #2563EB);
+}
+
+/* Each app tints the page, so it is obvious where you are about to sign in. */
+.login-app--pos        { --background: linear-gradient(160deg, #1E3A8A 0%, #2563EB 50%, #3B82F6 100%); }
+.login-app--smartloans { --background: linear-gradient(160deg, #064E3B 0%, #059669 55%, #34D399 100%); }
+.login-app--arcade     { --background: linear-gradient(160deg, #3B0764 0%, #7C3AED 55%, #A78BFA 100%); }
+.login-app--rewards    { --background: linear-gradient(160deg, #7C2D12 0%, #EA580C 55%, #FB923C 100%); }
+
+.login-app--smartloans { --login-accent: #059669; --login-accent-dark: #047857; --login-accent-glow: rgba(5, 150, 105, 0.4); }
+.login-app--arcade     { --login-accent: #7C3AED; --login-accent-dark: #6D28D9; --login-accent-glow: rgba(124, 58, 237, 0.4); }
+.login-app--rewards    { --login-accent: #EA580C; --login-accent-dark: #C2410C; --login-accent-glow: rgba(234, 88, 12, 0.4); }
