@@ -1,0 +1,61 @@
+/* Same look as POSVending's inline-styled inbox, as classes. */
+.inbox-list {
+  background: transparent;
+  padding: 0;
+}
+
+.inbox-item {
+  --background: transparent;
+  --padding-start: 10px;
+  --inner-padding-end: 10px;
+  --padding-top: 12px;
+  --padding-bottom: 12px;
+  --min-height: 0;
+  border-bottom: 1px solid #f1f5f9;
+  border-radius: 8px;
+}
+
+.inbox-item--unread {
+  --background: rgba(37, 99, 235, 0.06);
+}
+
+.inbox-icon {
+  font-size: 24px;
+  align-self: flex-start;
+  margin: 2px 12px 0 0;
+}
+.inbox-icon--success { color: #059669; }
+.inbox-icon--warning { color: #b45309; }
+.inbox-icon--error   { color: #dc2626; }
+.inbox-icon--info    { color: #2563eb; }
+
+.inbox-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.inbox-title-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.inbox-title {
+  font-size: 14px;
+}
+
+.inbox-badge {
+  flex-shrink: 0;
+}
+
+.inbox-message {
+  margin: 2px 0 4px;
+  font-size: 13px;
+  color: #374151;
+  white-space: normal;
+}
+
+.inbox-date {
+  font-size: 11px;
+  color: #9ca3af;
+}

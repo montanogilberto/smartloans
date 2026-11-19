@@ -1,0 +1,233 @@
+/**
+ * Mapas estado→etiqueta/color — única fuente de verdad por dominio.
+ * Antes cada página definía el suyo y "Aceptada" podía salir de otro color
+ * según la pantalla.
+ */
+export interface StatusMeta {
+  label: string;
+  color: string; // color Ionic (primary/success/danger/warning/medium)
+}
+
+/** Asientos contables (journalEntries.status). */
+export const JOURNAL_ENTRY_STATUS: Record<string, StatusMeta> = {
+  posted: { label: 'Contabilizado', color: 'success' },
+  void:   { label: 'Anulado',       color: 'medium'  },
+};
+
+/** Tipo de cuenta contable (chartOfAccounts.accountType). */
+export const ACCOUNT_TYPE: Record<string, StatusMeta> = {
+  asset:     { label: 'Activo',   color: 'primary' },
+  liability: { label: 'Pasivo',   color: 'warning' },
+  equity:    { label: 'Capital',  color: 'tertiary' },
+  income:    { label: 'Ingreso',  color: 'success' },
+  expense:   { label: 'Gasto',    color: 'danger'  },
+};
+
+/** Conversaciones de negociación (loanConversations.status). */
+export const CONVERSATION_STATUS: Record<string, StatusMeta> = {
+  open:     { label: 'Abierta',   color: 'primary' },
+  accepted: { label: 'Aceptada',  color: 'success' },
+  rejected: { label: 'Rechazada', color: 'danger'  },
+  closed:   { label: 'Cerrada',   color: 'medium'  },
+};
+
+/** Préstamos (loans.loanStatus, comparar en minúsculas). */
+export const LOAN_STATUS: Record<string, StatusMeta> = {
+  active:          { label: 'Activo',            color: 'success' },
+  pending:         { label: 'Pendiente',         color: 'warning' },
+  // RFC-002 no-custodio: aprobado pero esperando el SPEI del prestamista.
+  pending_funding: { label: 'Por fondear',       color: 'warning' },
+  overdue:         { label: 'Vencido',           color: 'danger'  },
+  defaulted:       { label: 'En mora',           color: 'danger'  },
+  paidoff:         { label: 'Pagado',            color: 'primary' },
+  closed:          { label: 'Cerrado',           color: 'medium'  },
+  cancelled:       { label: 'Cancelado',         color: 'medium'  },
+};
+
+/** Propuestas P2P (labels; los colores viven en P2PLendingPage.css .p2p-status-*). */
+export const PROPOSAL_STATUS: Record<string, { label: string }> = {
+  pending:   { label: 'Pendiente' },
+  accepted:  { label: 'Aceptada'  },
+  rejected:  { label: 'Rechazada' },
+  expired:   { label: 'Vencida'   },
+  cancelled: { label: 'Cancelada' },
+};
+
+/** Cascada de notificaciones (notificationDispatches.status). */
+export const NOTIFICATION_DISPATCH_STATUS: Record<string, StatusMeta> = {
+  // Only 'confirmed' means delivered to the person; pending + unconfirmed both await a final status.
+  confirmed: { label: 'Entrega confirmada',        color: 'success' },
+  unconfirmed: { label: 'Pendiente de confirmación', color: 'warning' },
+  pending:   { label: 'Pendiente de confirmación', color: 'warning' },
+  failed:    { label: 'Fallido',                   color: 'danger'  },
+  sent:      { label: 'Aceptado por el proveedor', color: 'medium'  },
+};
+
+/** Acuse de Meta de un mensaje de WhatsApp enviado (whatsappMessageDeliveries.status). */
+export const WHATSAPP_DELIVERY_STATUS: Record<string, StatusMeta> = {
+  accepted:  { label: 'Aceptado por Meta', color: 'medium'  },
+  sent:      { label: 'Enviado',           color: 'medium'  },
+  delivered: { label: 'Entregado',         color: 'medium'  },
+  read:      { label: 'Leído',             color: 'primary' },
+  failed:    { label: 'No entregado',      color: 'danger'  },
+};
+
+/** Canal de envío (notificationDispatches.selectedChannel) — verde=gratis, ambar=medio, rojo=caro. */
+export const NOTIFICATION_CHANNEL: Record<string, StatusMeta> = {
+  push:     { label: 'Push',     color: 'success' },
+  whatsapp: { label: 'WhatsApp', color: 'warning' },
+  sms:      { label: 'SMS',      color: 'danger'  },
+};
+
+/** Resultado de una ronda del arcade (arcadeRounds.outcome). */
+export const ARCADE_OUTCOME: Record<string, StatusMeta> = {
+  win:       { label: 'Ganada',    color: 'success' },
+  blackjack: { label: 'Blackjack', color: 'success' },
+  push:      { label: 'Empate',    color: 'warning' },
+  lose:      { label: 'Perdida',   color: 'medium'  },
+};
+
+/** Método de pago (income.paymentMethod / expenses.paymentMethod). */
+export const PAYMENT_METHOD: Record<string, StatusMeta> = {
+  efectivo:      { label: 'Efectivo',      color: 'success'  },
+  tarjeta:       { label: 'Tarjeta',       color: 'primary'  },
+  transferencia: { label: 'Transferencia', color: 'tertiary' },
+  monedero:      { label: 'Monedero',      color: 'secondary' },
+};
+
+/** Cuentas de cobro de la compañía (companyPaymentAccounts.accountStatus). */
+export const COMPANY_PAYMENT_ACCOUNT_STATUS: Record<string, StatusMeta> = {
+  pending_verification: { label: 'Por confirmar', color: 'warning' },
+  active:               { label: 'Activa',        color: 'success' },
+  archived:             { label: 'Archivada',     color: 'medium'  },
+};
+
+/** Tipo de egreso (expenses.expenseType). */
+export const EXPENSE_TYPE: Record<string, StatusMeta> = {
+  inventory: { label: 'Inventario', color: 'primary' },
+  general:   { label: 'General',    color: 'medium'  },
+  payroll:   { label: 'Nómina',     color: 'tertiary' },
+};
+
+/** Tipo de movimiento del ledger de puntos POS (posRewardTransactions.txType, comparar en minúsculas). */
+export const POS_REWARD_TX_TYPE: Record<string, StatusMeta> = {
+  earn:       { label: 'Ganados',   color: 'success' },
+  redeem:     { label: 'Canjeados', color: 'primary' },
+  adjustment: { label: 'Ajuste',    color: 'warning' },
+  expire:     { label: 'Expirado',  color: 'medium'  },
+};
+
+/** Estado de una redención de puntos POS (posRewardRedemptions.status). */
+export const POS_REWARD_REDEMPTION_STATUS: Record<string, StatusMeta> = {
+  applied:   { label: 'Aplicada',  color: 'success' },
+  cancelled: { label: 'Cancelada', color: 'medium'  },
+};
+
+/** dbo.clientFollowUps.status — staff follow-ups, Factory AI requests,
+ * juridical assignments. */
+export const FOLLOW_UP_STATUS: Record<string, StatusMeta> = {
+  pending:   { label: 'Pendiente',  color: 'warning' },
+  completed: { label: 'Completado', color: 'success' },
+  cancelled: { label: 'Cancelado',  color: 'medium' },
+};
+
+/** Empleados (dbo.status vía employees.statusId). */
+export const EMPLOYEE_STATUS: Record<string, StatusMeta> = {
+  active:   { label: 'Activo',   color: 'success' },
+  inactive: { label: 'Inactivo', color: 'medium' },
+};
+
+/** Tipo de notificación push (pushNotifications.notificationType). */
+export const NOTIFICATION_TYPE: Record<string, StatusMeta> = {
+  info:    { label: 'Información', color: 'primary' },
+  success: { label: 'Éxito',       color: 'success' },
+  warning: { label: 'Aviso',       color: 'warning' },
+  error:   { label: 'Error',       color: 'danger'  },
+  system:  { label: 'Sistema',     color: 'medium'  },
+};
+
+/** Lectura de una notificación push (pushNotifications.isRead): la marca la app del destinatario. */
+export const PUSH_READ_STATUS: Record<string, StatusMeta> = {
+  read:   { label: 'Leída',    color: 'success' },
+  unread: { label: 'Sin leer', color: 'warning' },
+};
+
+/** Prioridad de notificación push (pushNotifications.priority). */
+export const NOTIFICATION_PRIORITY: Record<string, StatusMeta> = {
+  low:      { label: 'Baja',    color: 'medium'  },
+  normal:   { label: 'Normal',  color: 'primary' },
+  high:     { label: 'Alta',    color: 'warning' },
+  critical: { label: 'Crítica', color: 'danger'  },
+};
+
+/** Catálogo de productos (products.isSupply / products.isActive). */
+export const PRODUCT_STATUS: Record<string, StatusMeta> = {
+  supply:   { label: 'Insumo',   color: 'tertiary' },
+  inactive: { label: 'Inactivo', color: 'medium'   },
+};
+
+/** Estado en vivo de una máquina ESP32 (laundryDevices: isActive / isOnline / lastStatus + uso activo). */
+export const LAUNDRY_DEVICE_STATUS: Record<string, StatusMeta> = {
+  running:  { label: 'En uso',      color: 'primary' },
+  idle:     { label: 'Disponible',  color: 'success' },
+  error:    { label: 'Error',       color: 'danger'  },
+  offline:  { label: 'Sin conexión', color: 'warning' },
+  inactive: { label: 'Desactivada', color: 'medium'  },
+};
+
+/** Cobro de una máquina (laundryDeviceUses.status). */
+export const LAUNDRY_USE_STATUS: Record<string, StatusMeta> = {
+  authorized: { label: 'Cobrado',   color: 'success' },
+  rejected:   { label: 'Rechazado', color: 'danger'  },
+  pending:    { label: 'Pendiente', color: 'warning' },
+};
+
+/** Reservaciones (reservations.status). */
+export const RESERVATION_STATUS: Record<string, StatusMeta> = {
+  pending:   { label: 'Pendiente',  color: 'warning' },
+  confirmed: { label: 'Confirmada', color: 'success' },
+  cancelled: { label: 'Cancelada',  color: 'medium'  },
+};
+
+/** Llamadas de voz del agente (voiceCalls.callStatus). */
+export const VOICE_CALL_STATUS: Record<string, StatusMeta> = {
+  queued:      { label: 'En cola',       color: 'medium'   },
+  ringing:     { label: 'Sonando',       color: 'primary'  },
+  in_progress: { label: 'En curso',      color: 'tertiary' },
+  completed:   { label: 'Completada',    color: 'success'  },
+  no_answer:   { label: 'Sin respuesta', color: 'warning'  },
+  busy:        { label: 'Ocupado',       color: 'warning'  },
+  failed:      { label: 'Fallida',       color: 'danger'   },
+  canceled:    { label: 'Cancelada',     color: 'danger'   },
+  skipped:     { label: 'Omitida',       color: 'light'    },
+};
+
+/** Acuerdo pactado en la llamada de voz (voiceCalls.agreementStatus). */
+export const VOICE_AGREEMENT_STATUS: Record<string, StatusMeta> = {
+  none:                 { label: 'Sin acuerdo',   color: 'light'   },
+  invalid:              { label: 'Inválido',      color: 'danger'  },
+  pending_confirmation: { label: 'Por confirmar', color: 'warning' },
+  confirmed:            { label: 'Confirmado',    color: 'success' },
+  cancelled:            { label: 'Cancelado',     color: 'danger'  },
+  expired:              { label: 'Expirado',      color: 'medium'  },
+};
+
+/** Catálogo de agentes IA (agents.status). No hay "apagado": retirado solo es estado de catálogo. */
+export const AGENT_STATUS: Record<string, StatusMeta> = {
+  activo:   { label: 'Activo', color: 'success' },
+  retirado: { label: 'Retirado', color: 'medium' },
+};
+
+/** Avisos operativos (/operational-notices): state is derived from the dates by the SP. */
+export const OPERATIONAL_NOTICE_STATE: Record<string, StatusMeta> = {
+  vigente:    { label: 'Vigente', color: 'danger' },
+  programado: { label: 'Programado', color: 'warning' },
+  vencido:    { label: 'Vencido', color: 'medium' },
+  finalizado: { label: 'Finalizado', color: 'medium' },
+};
+
+/** Biblioteca GMO de plantillas de avisos. */
+export const OPERATIONAL_NOTICE_TEMPLATE_STATUS: Record<string, StatusMeta> = {
+  activo:   { label: 'Activa', color: 'success' },
+  retirado: { label: 'Retirada', color: 'medium' },
+};

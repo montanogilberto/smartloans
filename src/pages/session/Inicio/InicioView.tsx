@@ -25,13 +25,6 @@ const InicioView: React.FC = () => {
               <IonButton fill="clear" onClick={vm.signOut} disabled={vm.retrying}>Cerrar sesión</IonButton>
             </>
           )}
-          {vm.state === 'no-smartloans' && (
-            <>
-              <h2>Tu cuenta no tiene SmartLoans</h2>
-              <p>Esta cuenta no está registrada como acreditado, prestamista ni jurídico.</p>
-              <IonButton onClick={vm.signOut}>Cerrar sesión</IonButton>
-            </>
-          )}
         </div>
       </IonContent>
     </IonPage>

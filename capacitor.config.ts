@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-// appId is provisional: confirm the final bundle id before creating the
-// iOS/Android projects — it can't be changed once published to the stores.
+// appId confirmed 2026-11-19 (same prefix as POS, com.factoryAI.gmo). It's baked
+// into ios/ and android/ and can't change once the app is in the stores.
 const config: CapacitorConfig = {
   appId: 'com.factoryAI.smartloans',
   appName: 'SmartLoans',

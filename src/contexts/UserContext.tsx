@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import { RoleCode, normalizeRoleCode, loadRoleCatalog } from '../config/rolePermissions';
 import { DEFAULT_AVATAR_URL } from '../utils/formatters';
+import { SMARTLOANS_COMPANY_ID } from '../config/appCompany';
 import { ClientType } from '../api/clientsApi';
 import { listClientCapabilities } from '../api/clientCapabilitiesApi';
 import { getOneCompany } from '../api/companiesApi';
@@ -74,6 +75,22 @@ const DEFAULT_AUTH: AuthData = {
   roleName: 'Empleado',
 };
 
+// ── App company ────────────────────────────────────────────────────────────
+/** SmartLoans sessions always run as company 1008 (config/appCompany.ts). A
+ * session saved under another company (an older build, a legacy company-1
+ * account) drops that company's name and cached capabilities so both reload. */
+const pinToAppCompany = (data: AuthData): AuthData => {
+  if (!data.isAuthenticated || data.companyId === SMARTLOANS_COMPANY_ID) return data;
+  console.log('[UserContext] pinning session company', data.companyId, '→', SMARTLOANS_COMPANY_ID);
+  return {
+    ...data,
+    companyId: SMARTLOANS_COMPANY_ID,
+    companyName: '',
+    clientCapabilities: [],
+    clientCapabilitiesKey: undefined,
+  };
+};
+
 // ── localStorage helpers ───────────────────────────────────────────────────
 const loadStoredAuth = (): AuthData => {
   console.log("🔵 UserContext: Loading stored auth from localStorage");
@@ -82,11 +99,11 @@ const loadStoredAuth = (): AuthData => {
     console.log("[UserContext] loadStoredAuth: raw =", raw);
     if (!raw) return DEFAULT_AUTH;
     const parsed = JSON.parse(raw) as Partial<AuthData>;
-    const result = {
+    const result = pinToAppCompany({
       ...DEFAULT_AUTH,
       ...parsed,
       roleCode: normalizeRoleCode(parsed.roleCode),
-    };
+    });
     console.log("[UserContext] loadStoredAuth: resulting isAuthenticated =", result.isAuthenticated);
     return result;
   } catch (err) {
@@ -200,12 +217,12 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   /** Full login — merges data and marks session as authenticated */
   const login = (data: Partial<AuthData>) => {
     console.log("🟢 UserContext LOGIN SUCCESS:", { ...auth, ...data, isAuthenticated: true });
-    const next: AuthData = {
+    const next: AuthData = pinToAppCompany({
       ...auth,
       ...data,
       roleCode: normalizeRoleCode(data.roleCode ?? auth.roleCode),
       isAuthenticated: true,
-    };
+    });
     saveAuth(next);
     // Re-read the DB role catalog: features granted since the page loaded
     // (new modules, /setting edits) must appear without a full reload.

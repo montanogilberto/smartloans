@@ -1,0 +1,147 @@
+//type_products.ts
+
+export interface ProductCategory {
+  productCategoryId: number;
+  name: string;
+  image: string;
+  companyId: number;
+}
+
+export interface ProductDetail {
+  productDetailId: number;
+  productId: number;
+  stockQuantity: number;
+  unitPrice: number;
+  salePrice: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductForm {
+  productFormId: number;
+  quantity: string;
+  productPackingPresentationId: number;
+  productsPackingTypeId: number;
+  /** Resolved names (sp_products_one). */
+  packingName?: string;
+  packingPresentationName?: string;
+}
+
+export interface ProductOptionChoice {
+  productOptionChoiceId: number;
+  productOptionId: number;
+  choiceKey: string;
+  name: string;
+  price: number;
+  createdAt: string;
+  updatedAt: string;
+  description: string;
+  /** Size of this choice (19 L, 600 ml); null for services. */
+  quantity?: number | null;
+  measurementId?: number | null;
+  /** Unit code: g, kg, ml, L, pz. */
+  unit?: string | null;
+}
+
+export interface ProductOption {
+  productOptionId: number;
+  productId: number;
+  optionKey: string;
+  name: string;
+  type: string;
+  /** checkbox options only: at least one choice must be picked. Radio is always required. */
+  isRequired?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  choices?: ProductOptionChoice[];
+}
+
+export interface Product {
+  productId: number;
+  name: string;
+  code: string;
+  dateOfExpire: string;
+  netContent?: number | null;
+  unitOfMeasure?: string | null;
+  referencePrice?: number | null;
+  imageUrl?: string | null;
+  productFormId: number;
+  manufactureId: number;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+  barCode: string;
+  categoryId: number;
+  companyId: number;
+  /** Consumable bought for the business (detergent, soap…), never sold in the POS menu. */
+  isSupply?: boolean;
+  /** false = deactivated (soft delete): hidden from the POS, the ticket agent and Nuevo Egreso. */
+  isActive?: boolean;
+  /** What the stock counts: 'pz', or 'ml' / 'g' for supplies sold by portion. */
+  stockUnit?: 'pz' | 'ml' | 'g';
+  /** Ledger stock (inventoryStock) returned by by_company_products / products_one. */
+  stockQuantity?: number;
+  options?: ProductOption[];
+  details?: ProductDetail[];
+  descriptions?: ProductDescription[];
+  category?: ProductCategory;
+  form?: ProductForm;
+}
+
+export interface ProductDescription {
+  productDescriptionId: number;
+  productId: number;
+  Dosage: string;
+  measurementId: number;
+  is_principal: string;
+  activeIngredientId: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductPackingPresentation {
+  productPackingPresentationId: number;
+  name: string;
+}
+
+export interface ProductPackingType {
+  productsPackingTypeId: number;
+  name: string;
+}
+
+export interface Choice {
+  productOptionChoiceId: number;
+  name: string;
+  price: number;
+}
+
+export interface Option {
+  productOptionId: number;
+  name: string;
+  type: 'radio' | 'checkbox';
+  isRequired?: boolean;
+  choices?: Choice[];
+}
+
+export interface ApiResponse {
+  products: Product[];
+}
+
+// Piezas interface for "Servicio Completo" product tracking
+export interface Piezas {
+  pantalones: number;
+  prendas: number;
+  otros: number;
+}
+
+// types.ts or inside CartContext if it's defined there
+export interface CartItem {
+  id: string;
+  productId: string;
+  name: string;
+  quantity: number;
+  price: number;
+  selectedOptions: { [key: string]: string | string[] };
+  selectedOptionLabels?: { [key: string]: string | string[] }; // 👈 add this line
+  pieces?: Piezas; // For "Servicio Completo" product
+}

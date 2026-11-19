@@ -5,13 +5,16 @@ import { smartLoansLanding } from '../../../utils/smartLoansLanding';
 
 const LOAD_TIMEOUT_MS = 10000;
 
+/** Where an account without a SmartLoans product chooses acreditado / prestamista / jurídico. */
+export const ENROLLMENT_ROUTE = '/registro';
+
 /** What /inicio shows while it decides where the session goes. */
-export type InicioState = 'loading' | 'load-failed' | 'no-smartloans';
+export type InicioState = 'loading' | 'load-failed';
 
 /**
  * Sends the session to its SmartLoans dashboard as soon as one is known (from
- * the role, or from the clientCapabilities UserContext fetches after login),
- * or explains that the account has none.
+ * the role, or from the clientCapabilities UserContext fetches after login).
+ * An account with none (e.g. a POS / Rewards customer) starts registration.
  */
 export function useInicio() {
   const history = useHistory();
@@ -26,7 +29,8 @@ export function useInicio() {
 
   useEffect(() => {
     if (landing) history.replace(landing);
-  }, [landing]);
+    else if (capabilitiesLoaded) history.replace(ENROLLMENT_ROUTE);
+  }, [landing, capabilitiesLoaded]);
 
   useEffect(() => {
     if (capabilitiesLoaded) return;
@@ -51,10 +55,9 @@ export function useInicio() {
     history.replace('/login');
   };
 
-  const state: InicioState =
-    landing || (!capabilitiesLoaded && !timedOut) ? 'loading'
-      : !capabilitiesLoaded ? 'load-failed'
-        : 'no-smartloans';
+  // Loaded capabilities always redirect (dashboard or registration), so only a
+  // load that timed out stays on this page.
+  const state: InicioState = !capabilitiesLoaded && timedOut && !landing ? 'load-failed' : 'loading';
 
   return { state, retrying, retry, signOut };
 }

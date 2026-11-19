@@ -1,0 +1,192 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonTitle, IonBadge, IonMenuButton } from '@ionic/react';
+import ConfirmBackButton from '../ui/ConfirmBackButton';
+import TokenBalanceChip from './TokenBalanceChip';
+import { helpCircleOutline, notificationsOutline, mailOutline, cartOutline, chatbubblesOutline, sparklesOutline } from 'ionicons/icons';
+import { PushNotifications } from '@capacitor/push-notifications';
+import { Capacitor } from '@capacitor/core';
+import { useHistory } from 'react-router-dom';
+import { useCart } from '../../contexts/CartContext';
+import { canAccess } from '../../config/rolePermissions';
+import { useUser } from '../../contexts/UserContext';
+import { fetchMyNotifications } from '../../api/myNotificationsApi';
+import { getChatConfig } from '../../api/loanChatApi';
+import { PosSupportTopic } from '../../api/posSupportChatApi';
+import { APP_ENV, IS_DEV_BUILD } from '../../utils/appEnv';
+import './Header.css';
+
+interface HeaderProps {
+  presentAlertPopover: (e: React.MouseEvent) => void;
+  presentMailPopover: (e: React.MouseEvent) => void;
+  screenTitle?: string;
+  showBackButton?: boolean;
+  backButtonText?: string;
+  backButtonHref?: string;
+  // Opt-in per page: shows the same "ask the assistant" sparkles button the
+  // SmartLoans role gets, pointed at /pos-support/{topic} instead of
+  // /loan-chat. Only rendered for POS roles (mirrors the SmartLoans button's
+  // own role gating) — pass this from Incomes/Expenses/Accounting pages only.
+  posSupportTopic?: PosSupportTopic;
+}
+
+const Header: React.FC<HeaderProps> = ({
+  presentAlertPopover,
+  presentMailPopover,
+  screenTitle = 'GMO',
+  showBackButton = false,
+  backButtonText = 'Atrás',
+  backButtonHref = '/',
+  posSupportTopic,
+}) => {
+  const history = useHistory();
+  const { cart } = useCart();
+  const { roleCode, userId, activeProduct } = useUser();
+  // No shopping cart concept in the SmartLoans (borrower/lender) experience.
+  // Follows the active product for self-service sessions (a POS customer who
+  // is also a borrower gets SmartLoans icons while in SmartLoans).
+  const isSmartLoansRole = activeProduct
+    ? activeProduct === 'borrower' || activeProduct === 'lender'
+    : roleCode === 'borrower' || roleCode === 'lender';
+  // POS customer (same rule as App.tsx's client tab bar).
+  const isClientRole = activeProduct ? activeProduct === 'pos' : roleCode === 'pos';
+  const [unreadCount, setUnreadCount] = useState(0);
+  const listenerRef = useRef<any>(null);
+  // LLM support agent (cuenta · contratos · legal GUÍA) — id from backend
+  // config; icon hidden when the assistant is not configured.
+  const [agentClientId, setAgentClientId] = useState(0);
+  useEffect(() => {
+    if (!isSmartLoansRole) return;
+    getChatConfig().then(c => setAgentClientId(c.agentEnabled ? c.agentClientId : 0)).catch(() => {});
+  }, [isSmartLoansRole]);
+
+  // Seed the badge from the persisted inbox (NotificationDeliveries.isRead) so
+  // it survives app restarts — previously it only counted pushes received while
+  // the app was open, so nothing was trackable afterwards.
+  useEffect(() => {
+    if (!userId) return;
+    fetchMyNotifications(userId)
+      .then(({ unreadCount: n }) => setUnreadCount(n))
+      .catch(() => {});
+  }, [userId]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    PushNotifications.addListener('pushNotificationReceived', () => {
+      setUnreadCount((c) => c + 1);
+    }).then((handle) => { listenerRef.current = handle; });
+    return () => { listenerRef.current?.remove(); };
+  }, []);
+
+  const handleNotificationsClick = () => {
+    console.log('[Header] bell → /notifications (inbox), unread =', unreadCount);
+    setUnreadCount(0);
+    history.push('/notifications');
+  };
+
+  // Calculate total quantity of products in cart
+  const totalQuantity = cart.reduce((acc, item) => acc + item.quantity, 0);
+
+  const handleCartClick = () => {
+    history.push('/cart');
+  };
+
+  return (
+    <IonHeader className="dashboard-header">
+      <IonToolbar color="light">
+        <IonButtons slot="start">
+          {/* The menu button stays reachable on phone widths even on pages that
+              show a back button (the split-pane menu is only permanent on wide
+              screens), otherwise those pages have no way to open the side menu. */}
+          <IonMenuButton
+            menu="main-menu"
+            autoHide={false}
+            className="only-mobile header-menu-button"
+            aria-label="Abrir menú"
+          />
+        </IonButtons>
+        <IonTitle className="screen-title" style={{ textAlign: 'center', flex: 1 }}>
+          {screenTitle}
+          {/* Bandera de build: visible solo en builds de desarrollo para saber
+              al instante si este dispositivo/app es de un developer. */}
+          {IS_DEV_BUILD && <IonBadge color="warning" className="header-env-badge">{APP_ENV.toUpperCase()}</IonBadge>}
+        </IonTitle>
+        <IonButtons slot="end">
+          {/* Company AI-token balance — POS staff only (hidden until the balance is known);
+              a customer has no use for it. */}
+          {!isSmartLoansRole && !isClientRole && <TokenBalanceChip />}
+          {/* Cart is the cashier's checkout — only roles with POS access. */}
+          {!isSmartLoansRole && canAccess(roleCode, 'pos') && (
+            <IonButton onClick={handleCartClick} title="Cart" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>
+              <span className="icon-with-badge">
+                <IonIcon icon={cartOutline} style={{ fontSize: '28px' }} />
+                {totalQuantity > 0 && (
+                  <IonBadge className="badge-side" color="danger">
+                    {totalQuantity}
+                  </IonBadge>
+                )}
+              </span>
+            </IonButton>
+          )}
+          {isSmartLoansRole && agentClientId > 0 && (
+            <IonButton
+              onClick={() => { console.log('[Header] agent icon → /loan-chat/new?lenderId=' + agentClientId); history.push(`/loan-chat/new?lenderId=${agentClientId}`); }}
+              title="Asistente SmartLoans"
+              className="header-action-button"
+              style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}
+            >
+              <IonIcon icon={sparklesOutline} style={{ fontSize: '28px' }} />
+            </IonButton>
+          )}
+          {isSmartLoansRole && (
+            <IonButton
+              onClick={() => { console.log('[Header] chat icon → /loan-chats'); history.push('/loan-chats'); }}
+              title="Chats"
+              className="header-action-button"
+              style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}
+            >
+              <IonIcon icon={chatbubblesOutline} style={{ fontSize: '28px' }} />
+            </IonButton>
+          )}
+          {!isSmartLoansRole && posSupportTopic && (
+            <IonButton
+              onClick={() => { console.log(`[Header] agent icon → /pos-support/${posSupportTopic}`); history.push(`/pos-support/${posSupportTopic}`); }}
+              title="Asistente POS"
+              className="header-action-button"
+              style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}
+            >
+              <IonIcon icon={sparklesOutline} style={{ fontSize: '28px' }} />
+            </IonButton>
+          )}
+          <IonButton onClick={handleNotificationsClick} title="Notifications" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>
+            <span className="icon-with-badge">
+              <IonIcon icon={notificationsOutline} style={{ fontSize: '28px' }} />
+              {unreadCount > 0 && (
+                <IonBadge className="badge-side" color="danger">
+                  {unreadCount}
+                </IonBadge>
+              )}
+            </span>
+          </IonButton>
+          <IonButton onClick={presentMailPopover} title="Messages" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>
+            <IonIcon icon={mailOutline} style={{ fontSize: '28px' }} />
+          </IonButton>
+          <IonButton onClick={presentAlertPopover} title="Help" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>
+            <IonIcon icon={helpCircleOutline} style={{ fontSize: '28px' }} />
+          </IonButton>
+
+        </IonButtons>
+      </IonToolbar>
+      {/* Back navigation gets its own row under the action bar — in the top
+          toolbar it competed with the menu/action icons for width. */}
+      {showBackButton && (
+        <IonToolbar color="light" className="header-back-bar">
+          <IonButtons slot="start">
+            <ConfirmBackButton text={backButtonText} defaultHref={backButtonHref} />
+          </IonButtons>
+        </IonToolbar>
+      )}
+    </IonHeader>
+  );
+};
+
+export default Header;

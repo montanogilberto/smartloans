@@ -7,7 +7,7 @@ import {
   eye, eyeOff, fingerPrintOutline, lockClosedOutline, logInOutline, personOutline, callOutline,
 } from 'ionicons/icons';
 import ClientPhoneLoginCard from './components/ClientPhoneLoginCard';
-import { LOGIN_APP_ICONS } from './LoginConstants';
+import { SMARTLOANS_MARK_SRC } from './LoginConstants';
 import { useLogin, LoginVM } from './LoginLogic';
 
 const PasswordForm: React.FC<{ vm: LoginVM }> = ({ vm }) => (
@@ -83,8 +83,8 @@ const LoginView: React.FC = () => {
           <IonRow className="ion-justify-content-center">
             <IonCol size="12" sizeSm="8" sizeMd="6" sizeLg="4">
               <div className="login-brand">
-                <div className="login-logo">
-                  <IonIcon icon={LOGIN_APP_ICONS.smartloans} aria-hidden="true" />
+                <div className="login-logo login-logo--mark">
+                  <IonIcon src={SMARTLOANS_MARK_SRC} aria-hidden="true" />
                 </div>
                 <h1 className="login-title">SmartLoans</h1>
                 <p className="login-subtitle">Préstamos entre personas</p>

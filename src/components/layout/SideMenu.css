@@ -1,0 +1,12 @@
+/* Profile header / menu-header / menu-footer looks come from theme/variables.css (shared with POS). */
+.side-menu-section {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ion-color-medium);
+}
+
+.side-menu-item--active {
+  --background: rgba(5, 150, 105, 0.08);
+  font-weight: 600;
+}

@@ -435,3 +435,9 @@
 .login-app--smartloans { --login-accent: #059669; --login-accent-dark: #047857; --login-accent-glow: rgba(5, 150, 105, 0.4); }
 .login-app--arcade     { --login-accent: #7C3AED; --login-accent-dark: #6D28D9; --login-accent-glow: rgba(124, 58, 237, 0.4); }
 .login-app--rewards    { --login-accent: #EA580C; --login-accent-dark: #C2410C; --login-accent-glow: rgba(234, 88, 12, 0.4); }
+
+/* SmartLoans mark (app-icon artwork): it has thin arrows around a coin, so it
+   needs more of the 72px box than the old single-glyph ionicon did. */
+.login-logo--mark ion-icon {
+  font-size: 60px;
+}

@@ -1,9 +1,6 @@
-import { cartOutline, walletOutline, gameControllerOutline, giftOutline } from 'ionicons/icons';
-import type { LoginApp } from '../../../utils/loginApps';
-
-export const LOGIN_APP_ICONS: Record<LoginApp, string> = {
-  pos: cartOutline,
-  smartloans: walletOutline,
-  arcade: gameControllerOutline,
-  rewards: giftOutline,
-};
+/**
+ * The SmartLoans mark (coin + lend/repay arrows) — same artwork as the app icon
+ * (resources/icon.svg). Arrows and coin use currentColor, so on the login logo
+ * box they render white like the old ionicon did.
+ */
+export const SMARTLOANS_MARK_SRC = '/icons/smartloans-mark.svg';
