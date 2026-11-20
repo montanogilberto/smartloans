@@ -33,6 +33,15 @@ export interface BankAccount {
   // cuenta ARCHIVED puede llegar con isVerified=1, así que "verificada" NUNCA
   // basta por sí sola para tratarla como destino de dinero.
   accountStatus?: 'PRIMARY' | 'PENDING_VERIFICATION' | 'ARCHIVED';
+  // Solo en cuentas sin verificar. El backend aún no envía micro-depósitos
+  // reales (sin cliente STP), así que microDepositSent llega en false; en modo
+  // MOCK trae el código de prueba para que el flujo sobreviva a una recarga.
+  microDepositSent?: boolean;
+  mockVerificationCents?: number;
+  // RFC-018 §3.3: intentos de centavos restantes; al llegar a 0 la verificación
+  // queda bloqueada (hasta que soporte la desbloquee).
+  attemptsRemaining?: number;
+  verificationLocked?: boolean;
 }
 
 export type BankAccountBucket = 'primary' | 'pending' | 'archived';

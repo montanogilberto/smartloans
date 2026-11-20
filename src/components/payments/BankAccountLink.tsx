@@ -53,6 +53,9 @@ const BankAccountLink: React.FC<Props> = ({ clientId, companyId, holderName, onC
   const [verifyingId, setVerifyingId] = useState<number | null>(null);
   const [cents, setCents] = useState('');
   const [mockCents, setMockCents] = useState<number | null>(null);
+  const [resending, setResending] = useState(false);
+  // Cuenta bloqueada por intentos en esta sesión (la lista lo trae tras recargar).
+  const [lockedId, setLockedId] = useState<number | null>(null);
 
   // Cuenta nueva que el usuario pidió activar (confirmación pendiente) y la
   // que está siendo promovida ahora mismo (spinner en su fila).
@@ -106,13 +109,35 @@ const BankAccountLink: React.FC<Props> = ({ clientId, companyId, holderName, onC
     setBusy(true); setError('');
     try {
       const r = await verifyBankAccount({ clientId, companyId, bankAccountId: verifyingId, amountCents: n });
+      if (r.locked) setLockedId(verifyingId);
       if (!r.verified) throw new Error(r.error ?? 'El monto no coincide.');
       setVerifyingId(null); setCents(''); setMockCents(null);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo verificar la cuenta.');
+      setCents('');
+      await load();  // refresca "Intentos restantes" / bloqueo desde el servidor
     }
     setBusy(false);
+  };
+
+  // "Reenviar código": hoy no hay micro-depósito real que reenviar (sin cliente
+  // STP), así que vuelve a leer el código pendiente del backend y lo muestra.
+  // Cuando exista el envío real, aquí se llamará al endpoint de reenvío.
+  const resendCode = async () => {
+    if (!verifyingId) return;
+    setResending(true); setError('');
+    try {
+      const fresh = await load();
+      const acc = fresh.find(a => a.bankAccountId === verifyingId);
+      const code = acc?.mockVerificationCents ?? null;
+      if (code == null) throw new Error('No se pudo reenviar el código. Intenta de nuevo más tarde.');
+      setMockCents(code);
+      showToast(`Modo prueba: tu código es ${code} centavos`);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'No se pudo reenviar el código.', 'danger');
+    }
+    setResending(false);
   };
 
   // Activar la cuenta nueva = transición PENDING_VERIFICATION → PRIMARY (D18).
@@ -145,6 +170,15 @@ const BankAccountLink: React.FC<Props> = ({ clientId, companyId, holderName, onC
   const archived = accounts.filter(a => bucketOf(a) === 'archived');
   // La que está esperando su micro-depósito (formulario de centavos abajo).
   const awaitingCents = pendingAccounts.find(a => a.bankAccountId === verifyingId && !a.isVerified) ?? null;
+
+  // Código de prueba: el de la respuesta de link, o el que trae la lista
+  // (sobrevive a cerrar el modal / recargar). Nunca existe en modo real.
+  const isLocked = !!awaitingCents
+    && (awaitingCents.verificationLocked === true || lockedId === awaitingCents.bankAccountId);
+  const testCents = awaitingCents && !isLocked ? (awaitingCents.mockVerificationCents ?? mockCents) : null;
+  // Solo pedimos centavos si de verdad hay algo que confirmar.
+  const canEnterCents = !!awaitingCents && !isLocked
+    && (awaitingCents.microDepositSent === true || testCents != null);
 
   const label = (a: BankAccount) => `${a.bankName ?? 'Banco'} ····${a.clabeLast4}`;
 
@@ -186,7 +220,9 @@ const BankAccountLink: React.FC<Props> = ({ clientId, companyId, holderName, onC
                   <h3>{label(a)}</h3>
                   <p>{verified
                     ? 'Verificada — será principal cuando no tengas préstamos activos.'
-                    : 'Esperando que confirmes el micro-depósito.'}</p>
+                    : a.microDepositSent
+                      ? 'Esperando que confirmes el micro-depósito.'
+                      : 'Pendiente de verificación.'}</p>
                 </IonLabel>
                 {promotingId === a.bankAccountId
                   ? <IonSpinner name="dots" slot="end" />
@@ -212,15 +248,39 @@ const BankAccountLink: React.FC<Props> = ({ clientId, companyId, holderName, onC
       )}
 
       {/* ── Micro-depósito: confirmar centavos de la cuenta nueva ───────── */}
-      {awaitingCents && (
+      {awaitingCents && isLocked && (
+        <div className="bal-section">
+          <IonNote color="danger">
+            Bloqueamos la verificación de tu cuenta {label(awaitingCents)} por demasiados
+            intentos. Contacta a soporte para desbloquearla.
+          </IonNote>
+        </div>
+      )}
+      {awaitingCents && !isLocked && !canEnterCents && (
         <div className="bal-section">
           <IonNote>
-            Enviamos un micro-depósito de centavos a tu cuenta {label(awaitingCents)}.
-            Ingresa los centavos exactos que recibiste para verificarla.
+            Aún no podemos verificar tu cuenta {label(awaitingCents)}: la verificación
+            por micro-depósito todavía no está disponible. No se envió ningún depósito,
+            así que no esperes un abono en tu estado de cuenta.
           </IonNote>
-          {mockCents !== null && (
+        </div>
+      )}
+      {awaitingCents && canEnterCents && (
+        <div className="bal-section">
+          <IonNote>
+            {awaitingCents.microDepositSent
+              ? <>Enviamos un micro-depósito de centavos a tu cuenta {label(awaitingCents)}.
+                  Ingresa los centavos exactos que recibiste para verificarla.</>
+              : <>Ingresa el código de centavos para verificar tu cuenta {label(awaitingCents)}.</>}
+          </IonNote>
+          {testCents != null && (
             <IonNote color="warning" className="bal-note-mock">
-              Modo prueba: usa {mockCents} centavos.
+              Modo prueba: no se envió dinero real. Usa {testCents} centavos.
+            </IonNote>
+          )}
+          {awaitingCents.attemptsRemaining != null && (
+            <IonNote className="bal-note-block">
+              Intentos restantes: {awaitingCents.attemptsRemaining}
             </IonNote>
           )}
           <IonItem>
@@ -230,6 +290,10 @@ const BankAccountLink: React.FC<Props> = ({ clientId, companyId, holderName, onC
           </IonItem>
           <IonButton expand="block" shape="round" disabled={busy} onClick={submitVerify}>
             {busy ? <IonSpinner name="crescent" /> : 'Verificar cuenta'}
+          </IonButton>
+          <IonButton expand="block" fill="clear" size="small"
+            disabled={busy || resending} onClick={resendCode}>
+            {resending ? <IonSpinner name="dots" /> : 'Reenviar código'}
           </IonButton>
         </div>
       )}
@@ -261,7 +325,7 @@ const BankAccountLink: React.FC<Props> = ({ clientId, companyId, holderName, onC
             <IonInput value={holder} onIonInput={(e) => setHolder(e.detail.value ?? '')} autocapitalize="words" />
           </IonItem>
           <IonNote className="bal-note-block">
-            Validamos el dígito de control y enviamos un micro-depósito para confirmar que la cuenta es tuya.
+            Validamos el dígito de control de tu CLABE y después confirmamos que la cuenta es tuya.
           </IonNote>
           <IonButton expand="block" shape="round" disabled={busy} onClick={submitLink}>
             {busy ? <IonSpinner name="crescent" /> : 'Vincular cuenta'}
