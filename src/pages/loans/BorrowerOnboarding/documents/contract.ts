@@ -18,7 +18,7 @@ TERCERA — PAGOS DIRECTOS ENTRE LAS PARTES (PLATAFORMA NO CUSTODIA): El Acredit
 
 CUARTA — CUENTAS CLABE: Cada parte registra en la plataforma una cuenta CLABE a su nombre. GMO Prestamos muestra la CLABE completa únicamente a la contraparte de este crédito, junto con el nombre del titular esperado, y deja registro de cada consulta. Antes de transferir, quien paga debe verificar que el nombre del titular que muestra su banco coincida con el que indica la plataforma; si no coincide, no debe realizar la transferencia y debe reportarlo en la plataforma.
 
-QUINTA — COMISIONES DE LA PLATAFORMA: Las comisiones por el uso de GMO Prestamos son independientes de este crédito. El Acreditado las paga directamente a GMO Prestamos dentro de la aplicación, y nunca se descuentan del monto del crédito ni de los pagos al Acreditante. El monto de cada comisión se muestra al Acreditado antes de que la pague.
+QUINTA — COMISIONES DE LA PLATAFORMA: El Acreditado no paga comisiones a GMO Prestamos. La comisión por el uso de la plataforma la paga el Acreditante directamente a GMO Prestamos, y no puede descontarse del monto del crédito ni cobrarse al Acreditado. Los servicios de la plataforma (documentación del crédito, avisos y recordatorios de pago, y administración del crédito en la aplicación) no tienen costo para el Acreditado.
 
 SEXTA — OBLIGACIONES DEL ACREDITADO:
 a) Destinar los recursos al fin declarado.

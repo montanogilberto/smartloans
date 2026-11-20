@@ -20,7 +20,7 @@ TERCERA — PLATAFORMA NO CUSTODIA: La Plataforma no recibe, retiene ni transfie
 
 CUARTA — CUENTAS CLABE: Cuando el Profesional indique a un Prestatario cómo pagar, únicamente le remitirá a la cuenta CLABE del Prestamista que muestra la Plataforma, con el nombre del titular esperado, y nunca proporcionará una cuenta distinta. La Plataforma deja registro de cada consulta de datos bancarios.
 
-QUINTA — COMISIONES DE LA PLATAFORMA: Las comisiones por el uso de la Plataforma son independientes de los créditos y de los honorarios del Profesional. El Profesional las paga directamente a la Plataforma dentro de la aplicación, y nunca se descuentan de los créditos ni de los pagos que reciban los Prestamistas. El monto de cada comisión se muestra al Profesional antes de que la pague.
+QUINTA — COMISIONES DE LA PLATAFORMA: El Profesional no paga comisiones a la Plataforma por el uso de la aplicación. La Plataforma no cobra, recibe ni retiene los honorarios del Profesional, que son independientes de los créditos y nunca se descuentan de los pagos que reciban los Prestamistas.
 
 SEXTA — OBLIGACIONES DEL PROFESIONAL:
 a) Mantener vigentes su identificación, datos biométricos y cédula profesional registrados en la Plataforma.

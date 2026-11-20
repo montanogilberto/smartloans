@@ -20,7 +20,12 @@ TERCERA — PLATAFORMA NO CUSTODIA: La Plataforma no recibe, retiene ni transfie
 
 CUARTA — CUENTAS CLABE: El Prestamista registra en la Plataforma una cuenta CLABE a su nombre. La Plataforma muestra la CLABE completa únicamente a la contraparte de cada crédito, junto con el nombre del titular esperado, y deja registro de cada consulta. Antes de desembolsar, el Prestamista debe verificar que el nombre del titular que muestra su banco coincida con el que indica la Plataforma; si no coincide, no debe realizar la transferencia y debe reportarlo en la Plataforma.
 
-QUINTA — COMISIONES DE LA PLATAFORMA: Las comisiones por el uso de la Plataforma son independientes de los créditos. El Prestamista las paga directamente a la Plataforma dentro de la aplicación, y nunca se descuentan de los créditos que otorga ni de los pagos que recibe de los Prestatarios. El monto de cada comisión se muestra al Prestamista antes de que la pague.
+QUINTA — COMISIONES DE LA PLATAFORMA: Por cada crédito que otorgue, el Prestamista paga a la Plataforma una comisión del 5% (cinco por ciento) sobre el monto del crédito (capital), más el Impuesto al Valor Agregado correspondiente. La comisión cubre: el acceso a la red de Prestatarios verificados; la preparación de la documentación del crédito (contrato, pagaré y constancia de resguardo); los avisos y recordatorios de pago (alertas, mensajes y llamadas) de cada amortización; y la administración del crédito dentro de la aplicación.
+a) La comisión se cobra con tarjeta, a través del procesador de pagos de la Plataforma, al firmarse el crédito y antes del desembolso. El monto se muestra al Prestamista antes de que la pague.
+b) Si el crédito se cancela antes del desembolso, la comisión se reembolsa íntegramente. Una vez realizado el desembolso no es reembolsable, aun en caso de incumplimiento del Prestatario.
+c) La comisión es independiente del crédito: el Prestamista no puede descontarla del monto que desembolsa ni cobrarla al Prestatario.
+d) La Plataforma emite el comprobante fiscal (CFDI) correspondiente a cada comisión.
+La comisión es el único pago que la Plataforma recibe; no recibe, retiene ni transfiere el dinero de los créditos.
 
 SEXTA — OBLIGACIONES DEL PRESTAMISTA:
 a) Mantener vigentes su identificación, datos biométricos y cuenta CLABE registrados en la Plataforma.

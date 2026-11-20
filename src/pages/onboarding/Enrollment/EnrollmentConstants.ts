@@ -22,7 +22,7 @@ export const ENROLL_OPTIONS: EnrollOption[] = [
     product: 'borrower',
     label: 'Acreditado',
     desc: 'Solicita préstamos a otros clientes.',
-    next: 'Verificarás tu identificación y rostro, y firmarás pagaré y contrato antes de tu primer préstamo.',
+    next: 'Verificarás tu identificación y rostro, firmarás pagaré y contrato, y registrarás la CLABE donde recibirás tu préstamo.',
   },
   {
     capability: 'SMARTLOANS_LENDER',

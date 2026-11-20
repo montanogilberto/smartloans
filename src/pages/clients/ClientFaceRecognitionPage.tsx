@@ -10,6 +10,7 @@ import {
   IonCard,
   IonCardHeader,
   IonCardTitle,
+  IonNote,
   IonCardContent,
   IonRadioGroup,
   IonRadio,
@@ -39,9 +40,7 @@ import IdExtractedFieldsSummary from '../../components/kyc/IdExtractedFieldsSumm
 import ZoomableImage from '../../components/ui/ZoomableImage';
 import PresenceCapture, { PresenceCaptureResult } from '../../components/kyc/PresenceCapture';
 import SignaturePad from '../../components/kyc/SignaturePad';
-import SavedCardSetup from '../../components/payments/SavedCardSetup';
-import NativeConnectOnboarding from '../../components/payments/NativeConnectOnboarding';
-import { buildKycPrefill, kycFieldsToIne } from '../../utils/kycPrefill';
+import BankAccountLink from '../../components/payments/BankAccountLink';
 import { actsAsLender } from '../../utils/productContext';
 import { ineVigenciaProblem, parseVigenciaYear } from '../../utils/ineVigencia';
 import { isStaffRole } from '../../config/rolePermissions';
@@ -116,6 +115,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const [error, setError] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  // Lender payment step: true once a verified PRIMARY CLABE exists — the same
+  // rule the lender dashboard's "Registra tu cuenta bancaria" step checks.
+  const [hasPrimaryClabe, setHasPrimaryClabe] = useState(false);
 
   const [clientSelectorOpen, setClientSelectorOpen] = useState(false);
 
@@ -342,13 +344,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // '' = the lookup gave nothing.
   const [gpsAddress, setGpsAddress] = useState<string | undefined>(undefined);
 
-  // The payment step differs by role. Lenders (and 'both') RECEIVE money, so
-  // theirs is a payout account — a Custom connected account onboarded natively
-  // (NativeConnectOnboarding), which lets them receive repayments and withdraw
-  // to their CLABE. Borrowers are CHARGED for repayments, so theirs is a card
-  // on file (SavedCardSetup) on the platform account. Both run on the single
-  // POS GMO platform account; the one-time Connect platform-profile must be
-  // configured in the Stripe Dashboard for the lender path to create accounts.
+  // The last step (Paso 7) registers the CLABE for every role: borrowers
+  // receive the loan there, lenders receive the cuotas there (direct SPEI).
   // The type being registered: what the caller said, else inferred (staff picking a
   // client from the list, old deep links) from the client type / active product.
   const signerRole: KycSignerRole = location.state?.registerAs
@@ -356,7 +353,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
       || (!isStaff && actsAsLender(roleCode, activeProduct))) ? 'lender' : 'borrower');
   const isPayoutClient = signerRole === 'lender';
   const signerDocs = kycDocumentsFor(signerRole);
-  const paymentStepLabel = isPayoutClient ? 'Cuenta de pago' : 'Tarjeta';
+  const paymentStepLabel = 'Cuenta CLABE';
   const signerName = extractedIdFields.nombre?.trim()
     || (selectedClient ? `${selectedClient.first_name} ${selectedClient.last_name}`.trim() : '');
 
@@ -1930,76 +1927,34 @@ const ClientFaceRecognitionPage: React.FC = () => {
       </IonCard>
     );
 
-    // step === 6 — the payment step, reached after a successful contract
-    // submission. Borrowers register a repayment card; lenders onboard a native
-    // Custom connected account (payout destination). Both on the single POS GMO
-    // platform account — the lender path needs the one-time Connect
-    // platform-profile configured in the Stripe Dashboard.
+    // step === 6 — the CLABE step, reached after a successful contract
+    // submission, for borrowers and lenders alike (RFC-001 / RFC-016 phase 1).
+    // Saved in bankAccounts — the same record both dashboards' "Primeros pasos"
+    // read — so the CLABE is asked for once and never sent to Stripe. The
+    // borrower receives the loan here; the lender receives the cuotas here.
+    // GMO Prestamos never moves the money (D1).
     if (deepLinkClientId && companyId) {
-      if (!isPayoutClient) {
-        // Borrower — card on file for automatic monthly repayment charges.
-        return (
-          <IonCard className="client-face-recognition-step-card">
-            <IonCardHeader>
-              <IonCardTitle>Paso 7: Tarjeta para cobros automáticos</IonCardTitle>
-            </IonCardHeader>
-            <IonCardContent>
-              <p>Registra la tarjeta con la que se cobrarán automáticamente las cuotas de tu préstamo cada mes.</p>
-              <SavedCardSetup
-                clientId={deepLinkClientId}
-                companyId={companyId}
-                onSaved={() => {
-                  console.log('[Expediente] step 5: repayment card saved, returning to', returnTo);
-                  setToastMessage('Tarjeta registrada correctamente.');
-                  setShowToast(true);
-                  history.push(returnTo);
-                }}
-              />
-            </IonCardContent>
-          </IonCard>
-        );
-      }
-      // Lender (or 'both') — native payout onboarding, rendered DIRECTLY (the
-      // form self-creates the Custom connected account on identity submit and
-      // surfaces its own errors inline, so it is no longer gated behind a
-      // separate pre-provision call that hid it whenever that call failed).
       return (
         <IonCard className="client-face-recognition-step-card">
           <IonCardHeader>
-            <IonCardTitle>Paso 7: Cuenta de pago</IonCardTitle>
+            <IonCardTitle>Paso 7: Cuenta para recibir dinero</IonCardTitle>
           </IonCardHeader>
           <IonCardContent>
-            <p>Registra tu cuenta bancaria o tarjeta de débito para recibir pagos.</p>
-            <NativeConnectOnboarding
+            <p>{isPayoutClient
+              ? 'Registra la CLABE donde recibirás los pagos de tus préstamos por SPEI.'
+              : 'Registra la CLABE donde recibirás el dinero de tu préstamo por SPEI.'}</p>
+            <BankAccountLink
               clientId={deepLinkClientId}
               companyId={companyId}
-              email={selectedClient?.email?.trim() || `client${deepLinkClientId}@posgmo.mx`}
-              onProgress={(done) => { if (done) history.push(returnTo); }}
-              // Persist the client's edited identity back onto their record so
-              // the corrections (name split, cleaned address, DOB) survive and
-              // re-seed the form next time instead of reverting to the raw OCR.
-              onIdentitySaved={async (f) => {
-                const ine = kycFieldsToIne(f);
-                setExtractedIdFields((prev) => ({ ...prev, ...ine }));
-                try {
-                  if (clientFaceRecognitionIdRef.current) {
-                    await upsertClientFaceRecognition(
-                      Number(companyId), Number(selectedClient?.clientId), documentType,
-                      { nombre: ine.nombre, domicilio: ine.domicilio, fechaNacimiento: ine.fechaNacimiento, rfc: ine.rfc },
-                      clientFaceRecognitionIdRef.current,
-                    );
-                    console.log('[Expediente] persisted edited KYC identity onto record', clientFaceRecognitionIdRef.current);
-                  }
-                } catch (e) { console.warn('[Expediente] could not persist KYC identity edits:', e); }
-              }}
-              // Seed Stripe's identity fields from the INE we just captured
-              // plus the client's real email/phone from their account, rather
-              // than making them retype it.
-              prefill={buildKycPrefill(extractedIdFields, {
-                email: selectedClient?.email,
-                cellphone: selectedClient?.cellphone,
-              })}
+              holderName={signerName}
+              onChanged={(list) => setHasPrimaryClabe(list.some(a => a.isVerified && a.isDefault && a.accountStatus !== 'ARCHIVED'))}
             />
+            <IonNote style={{ display: 'block', margin: '12px 0', fontSize: 13 }}>
+              Tu CLABE se guarda en GMO Prestamos y sólo se muestra a la persona de tu préstamo para que te transfiera por SPEI. GMO Prestamos no recibe ni mueve tu dinero.
+            </IonNote>
+            <IonButton expand="block" disabled={!hasPrimaryClabe} onClick={() => history.push(returnTo)}>
+              Continuar
+            </IonButton>
           </IonCardContent>
         </IonCard>
       );
