@@ -27,7 +27,7 @@ import {
   IonButtons,
   useIonAlert,
 } from '@ionic/react';
-import { checkmark, chevronForward, cameraOutline, refreshOutline, personOutline, idCardOutline, documentTextOutline, close, closeOutline } from 'ionicons/icons';
+import { checkmark, chevronForward, cameraOutline, refreshOutline, personOutline, idCardOutline, documentTextOutline, close, closeOutline, downloadOutline } from 'ionicons/icons';
 import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
@@ -59,13 +59,15 @@ import {
   getAllClientFaceRecognitions,
   fetchKycImageAsDataUrl,
 } from '../../api/clientFaceRecognitionApi';
+import { getClientAddresses, saveClientAddress } from '../../api/addressesApi';
 import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../../utils/faceLiveness';
 import { ExtractedIdFields, extractIneFields, mergeOcrPass, frontNeedsAnotherPass, IdFieldSource } from '../../utils/idOcr';
 import { cropIneSignatureRegion } from '../../utils/signatureCrop';
 import {
   KycDocumentId, KycSignerRole, kycDocumentsFor, kycDocumentText, generateContractPdfBase64, generatePagarePdfBase64,
-  generateResguardoPdfBase64,
+  generateResguardoPdfBase64, buildKycDocumentPreviewPdf,
 } from '../../utils/contractPdf';
+import { savePdf } from '../../utils/savePdf';
 
 import './ClientFaceRecognitionPage.css';
 
@@ -140,7 +142,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // through the client picker.
   const isStaff = isStaffRole(roleCode);
   const deepLinkClientId = isStaff ? location.state?.clientId : (contextClientId || undefined);
-  const continueToPayments = !!location.state?.continueToPayments;
+  // Jurídico signs only its services contract: it neither pays nor receives
+  // loan money, so there is no payment step after Firma.
+  const continueToPayments = !!location.state?.continueToPayments && location.state?.registerAs !== 'juridical';
   // Default "done" destination is role-aware: a lender must return to the LENDER
   // dashboard, not the borrower one. Only used when the caller didn't pass an
   // explicit returnTo (the lender/borrower dashboards do pass it).
@@ -192,6 +196,12 @@ const ClientFaceRecognitionPage: React.FC = () => {
         }
         clientFaceRecognitionIdRef.current = record.clientFaceRecognitionId;
         if (record.documentType) setDocumentType(record.documentType as typeof documentType);
+        // The GPS address saved at the presence capture (best-effort).
+        if (record.presenceVideoBlobUrl) {
+          getClientAddresses(Number(companyId), Number(deepLinkClientId))
+            .then((rows) => setGpsAddress(rows.find((a) => a.source === 'gps')?.fullAddress ?? ''))
+            .catch((err) => console.warn('[Expediente] resume: could not load addresses —', String(err)));
+        }
         if (record.idFrontImageBlobUrl) setIdFrontImageBlobUrl(record.idFrontImageBlobUrl);
         if (record.idBackImageBlobUrl) setIdBackImageBlobUrl(record.idBackImageBlobUrl);
         if (record.clientSelfieBlobUrl) setClientSelfieBlobUrl(record.clientSelfieBlobUrl);
@@ -286,6 +296,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const [hasPhysicalPagare, setHasPhysicalPagare] = useState<boolean>(false);
   // The legal document open for reading at the Contrato step (null = none).
   const [readingDoc, setReadingDoc] = useState<KycDocumentId | null>(null);
+  const [downloadingDoc, setDownloadingDoc] = useState(false);
+  const [docDownloadError, setDocDownloadError] = useState('');
   const [presentAlert] = useIonAlert();
   const [contractAcceptedAt, setContractAcceptedAt] = useState<string>('');
   const [livenessStatus, setLivenessStatus] = useState<'idle' | 'ready' | 'in-progress' | 'completed' | 'failed'>('idle');
@@ -325,6 +337,10 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // Tracks the ClientFaceRecognition row created on first capture, so later
   // captures/scores update that same row instead of creating duplicates.
   const clientFaceRecognitionIdRef = useRef<number | undefined>(undefined);
+  // Address reverse-geocoded from the presence capture, kept apart from the
+  // INE Domicilio (dbo.addresses, source 'gps'). undefined = no capture yet;
+  // '' = the lookup gave nothing.
+  const [gpsAddress, setGpsAddress] = useState<string | undefined>(undefined);
 
   // The payment step differs by role. Lenders (and 'both') RECEIVE money, so
   // theirs is a payout account — a Custom connected account onboarded natively
@@ -343,6 +359,30 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const paymentStepLabel = isPayoutClient ? 'Cuenta de pago' : 'Tarjeta';
   const signerName = extractedIdFields.nombre?.trim()
     || (selectedClient ? `${selectedClient.first_name} ${selectedClient.last_name}`.trim() : '');
+
+  // What the "Leer" modal shows and what its download button saves: the same filled text.
+  const readingDocFill = () => ({
+    nombre: signerName,
+    domicilio: extractedIdFields.domicilio ?? '',
+    signerRole,
+    date: new Date(),
+  });
+
+  const downloadReadingDoc = async () => {
+    if (!readingDoc || downloadingDoc) return;
+    const title = signerDocs.find(d => d.id === readingDoc)?.title ?? 'Documento';
+    setDownloadingDoc(true);
+    try {
+      const doc = buildKycDocumentPreviewPdf(readingDoc, title, readingDocFill());
+      const fileName = `${title.normalize('NFD').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-')}.pdf`;
+      await savePdf(doc, fileName);
+    } catch (err) {
+      console.error('[Expediente] document download failed', err);
+      setDocDownloadError('No se pudo descargar el documento. Intenta de nuevo.');
+    } finally {
+      setDownloadingDoc(false);
+    }
+  };
 
   // Verificación (2) only shows the biometric result; Datos (3) is the review
   // of what was read from the INE; Contrato (4) is reading + accepting the three
@@ -677,18 +717,39 @@ const ClientFaceRecognitionPage: React.FC = () => {
       console.error('[Expediente] Failed to upload presence capture:', err);
     }
 
-    // Domicilio can't be read off the ID (see idOcr.ts) — reverse-geocode
-    // the GPS just captured as the actual address source. Best-effort: a
-    // failure here just leaves Domicilio empty/manual, same as before this
-    // existed.
+    // Domicilio stays the INE's. The GPS address is kept beside it (read-only
+    // "Ubicación actual (GPS)" on Tus datos, dbo.addresses source 'gps'); it
+    // used to overwrite the INE one with the map's version. Best-effort: a
+    // failure only leaves the GPS field as "No disponible".
     if (result.latitude !== null && result.longitude !== null) {
+      let address = '';
       try {
-        const { address } = await reverseGeocode(result.latitude, result.longitude);
-        console.log('[Expediente] handlePresenceCapture: reverse-geocoded address =', address);
-        if (address) setExtractedIdFields((prev) => ({ ...prev, domicilio: address }));
+        address = (await reverseGeocode(result.latitude, result.longitude)).address?.trim() ?? '';
+        // Whether an address came back — never the address itself (personal data).
+        console.log('[Expediente] handlePresenceCapture: reverse-geocoded, hasAddress =', !!address);
       } catch (err) {
         console.error('[Expediente] Reverse geocoding failed:', err);
       }
+      setGpsAddress(address);
+      if (address) {
+        try {
+          await saveClientAddress({
+            companyId: Number(companyId),
+            clientId: selectedClient.clientId,
+            source: 'gps',
+            fullAddress: address,
+            clientFaceRecognitionId: clientFaceRecognitionIdRef.current,
+            latitude: result.latitude,
+            longitude: result.longitude,
+            accuracyMeters: result.accuracyMeters,
+          });
+          console.log('[Expediente] handlePresenceCapture: gps address saved');
+        } catch (err) {
+          console.warn('[Expediente] handlePresenceCapture: gps address not saved —', String(err));
+        }
+      }
+    } else {
+      setGpsAddress('');
     }
   };
 
@@ -925,6 +986,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
     setStep(0);
     setCaptureSubStep('doc-intro');
     setSelectedClient(null);
+    setGpsAddress(undefined);
     setDocumentType('');
     setIdFrontImageBase64('');
     setIdBackImageBase64('');
@@ -1085,6 +1147,22 @@ const ClientFaceRecognitionPage: React.FC = () => {
         setToastMessage(`Error al enviar el contrato: ${response.msg || ''}`);
         setShowToast(true);
       } else {
+        // The INE address as confirmed on "Tus datos" (dbo.addresses source
+        // 'ine'). Best-effort: the contract already carries it in domicilio.
+        if (idf.domicilio.trim()) {
+          try {
+            await saveClientAddress({
+              companyId: Number(companyId),
+              clientId: Number(selectedClient?.clientId),
+              source: 'ine',
+              fullAddress: idf.domicilio,
+              clientFaceRecognitionId: clientFaceRecognitionIdRef.current,
+            });
+            console.log('[Expediente] handleSubmitContract: ine address saved');
+          } catch (err) {
+            console.warn('[Expediente] handleSubmitContract: ine address not saved —', String(err));
+          }
+        }
         const finish = () => {
           if (continueToPayments) {
             console.log('[Expediente] handleSubmitContract: SUCCESS — advancing to payment step');
@@ -1113,9 +1191,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
         } else {
           presentAlert({
             header: 'Documentos firmados',
-            message: signerRole === 'lender'
-              ? 'Tu contrato con GMO Prestamos se guardó. También lo encuentras en tu expediente digital.'
-              : 'Tu contrato, pagaré y constancia se guardaron. También los encuentras en tu expediente digital.',
+            message: signerRole === 'borrower'
+              ? 'Tu contrato, pagaré y constancia se guardaron. También los encuentras en tu expediente digital.'
+              : 'Tu contrato con GMO Prestamos se guardó. También lo encuentras en tu expediente digital.',
             backdropDismiss: false,
             buttons: [
               ...saved.map(d => ({
@@ -1730,6 +1808,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
             lowConfidence={ocrLowFields}
             ocrLoading={ocrLoading}
             ocrError={ocrError}
+            frontImage={idFrontImageBase64 || idFrontImageBlobUrl}
+            backImage={idBackImageBase64 || idBackImageBlobUrl}
+            gpsAddress={gpsAddress}
           />
           {!ocrLoading && vigenciaProblem && (
             <p className="cfr-vigencia-problem" role="alert">{vigenciaProblem}</p>
@@ -1766,6 +1847,11 @@ const ClientFaceRecognitionPage: React.FC = () => {
               <IonToolbar>
                 <IonTitle>{signerDocs.find(d => d.id === readingDoc)?.title}</IonTitle>
                 <IonButtons slot="end">
+                  <IonButton onClick={downloadReadingDoc} disabled={downloadingDoc} aria-label="Descargar PDF">
+                    {downloadingDoc
+                      ? <IonSpinner name="crescent" />
+                      : <IonIcon icon={downloadOutline} slot="icon-only" />}
+                  </IonButton>
                   <IonButton onClick={() => setReadingDoc(null)} aria-label="Cerrar">
                     <IonIcon icon={close} slot="icon-only" />
                   </IonButton>
@@ -1774,14 +1860,16 @@ const ClientFaceRecognitionPage: React.FC = () => {
             </IonHeader>
             <IonContent className="ion-padding">
               <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-                {readingDoc && kycDocumentText(readingDoc, {
-                  nombre: signerName,
-                  domicilio: extractedIdFields.domicilio ?? '',
-                  signerRole,
-                  date: new Date(),
-                })}
+                {readingDoc && kycDocumentText(readingDoc, readingDocFill())}
               </p>
             </IonContent>
+            <IonToast
+              isOpen={!!docDownloadError}
+              message={docDownloadError}
+              duration={5000}
+              color="danger"
+              onDidDismiss={() => setDocDownloadError('')}
+            />
           </IonModal>
 
           <IonItem>
@@ -1824,10 +1912,13 @@ const ClientFaceRecognitionPage: React.FC = () => {
           <IonCardTitle>Paso 6: Firma</IonCardTitle>
         </IonCardHeader>
         <IonCardContent>
-          <p>{signerRole === 'lender'
-            ? 'Firma para validar tu identidad y enviar tu contrato con GMO Prestamos.'
-            : 'Firma para validar tu identidad y enviar el contrato, el pagaré y la constancia.'}</p>
+          <p>{signerRole === 'borrower'
+            ? 'Firma para validar tu identidad y enviar el contrato, el pagaré y la constancia.'
+            : 'Firma para validar tu identidad y enviar tu contrato con GMO Prestamos.'}</p>
           <div className="ion-margin-top">
+            <p style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 600, color: '#334155' }}>
+              Firma como aparece en tu INE
+            </p>
             <SignaturePad
               label="Firma aquí para validar tu identidad"
               onSave={(dataUrl) => setContractSignatureBase64(dataUrl)}
@@ -1958,12 +2049,6 @@ const ClientFaceRecognitionPage: React.FC = () => {
           </IonButton>
         </div>
         <StepBar />
-        <div className={`kyc-register-as kyc-register-as--${signerRole}`} role="status">
-          Registro como <strong>{signerRole === 'lender' ? 'Prestamista' : 'Prestatario'}</strong>
-          <span>{signerRole === 'lender'
-            ? 'Firmarás tu contrato de crédito con GMO Prestamos.'
-            : 'Firmarás contrato de crédito, pagaré y constancia de resguardo con tu prestamista.'}</span>
-        </div>
         {renderStepContent()}
       </IonContent>
 

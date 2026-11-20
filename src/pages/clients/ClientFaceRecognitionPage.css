@@ -383,40 +383,6 @@
   font-weight: 600;
 }
 
-/* Which type this KYC is registering — decides the documents to sign. */
-.kyc-register-as {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 0 16px 12px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  font-size: 14px;
-  border-left: 4px solid;
-}
-
-.kyc-register-as span {
-  font-size: 12px;
-  opacity: 0.85;
-}
-
-.kyc-register-as--lender {
-  background: rgba(5, 150, 105, 0.1);
-  border-left-color: #059669;
-  color: #065f46;
-}
-
-.kyc-register-as--borrower {
-  background: rgba(37, 99, 235, 0.1);
-  border-left-color: #2563eb;
-  color: #1e3a8a;
-}
-
-@media (prefers-color-scheme: dark) {
-  .kyc-register-as--lender { color: #6ee7b7; }
-  .kyc-register-as--borrower { color: #93c5fd; }
-}
-
 /* ✕ to leave the wizard (confirm first). */
 .cfr-topbar {
   display: flex;

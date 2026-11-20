@@ -4,6 +4,7 @@
  *
  * Who signs what:
  *   - Prestamista ↔ GMO Prestamos: Contrato de Crédito (lenderContract.ts).
+ *   - Profesional Jurídico ↔ GMO Prestamos: Contrato de Servicios (juridicalContract.ts).
  *   - Prestatario ↔ Prestamista: Contrato de Crédito (contract.ts), Pagaré and
  *     Constancia de Resguardo del pagaré.
  *
@@ -18,6 +19,7 @@ import { CONTRACT_TEXT } from './contract';
 import { PAGARE_TEXT } from './pagare';
 import { RESGUARDO_TEXT } from './resguardo';
 import { LENDER_CONTRACT_TEXT } from './lenderContract';
+import { JURIDICAL_CONTRACT_TEXT } from './juridicalContract';
 
 export const PLATFORM_NAME = 'GMO Prestamos';
 
@@ -26,8 +28,8 @@ export interface DocumentFillData {
   nombre: string;
   /** Address as reviewed on the Datos step. */
   domicilio: string;
-  /** Which side of the loan the signer is on. */
-  signerRole: 'lender' | 'borrower';
+  /** Which side the signer is on ('juridical' = the Jurídico professional, not a loan party). */
+  signerRole: 'lender' | 'borrower' | 'juridical';
   /** Signing date. */
   date: Date;
 }
@@ -55,9 +57,18 @@ export function fillLenderContract(data: DocumentFillData): string {
   return t;
 }
 
+/** The Jurídico professional's services contract with GMO Prestamos. Role-independent. */
+export function fillJuridicalContract(data: Pick<DocumentFillData, 'nombre' | 'date'>): string {
+  let t = JURIDICAL_CONTRACT_TEXT;
+  t = fillOnce(t, 'a _______________', `a ${longDate(data.date)}`);
+  t = fillOnce(t, '- PROFESIONAL JURÍDICO: _________________________________', `- PROFESIONAL JURÍDICO: ${nameOr(data.nombre, 'el Profesional registrado en la Plataforma')}`);
+  return t;
+}
+
 /** The borrower's credit contract with their lender (known once an offer is accepted). */
 export function fillContract(data: DocumentFillData): string {
   if (data.signerRole === 'lender') return fillLenderContract(data);
+  if (data.signerRole === 'juridical') return fillJuridicalContract(data);
   let t = CONTRACT_TEXT;
   t = fillOnce(t, 'a _______________', `a ${longDate(data.date)}`);
   t = fillOnce(t, '- ACREDITANTE: _________________________________ (Prestamista)', `- ACREDITANTE: ${LENDER_TBD} (Prestamista)`);

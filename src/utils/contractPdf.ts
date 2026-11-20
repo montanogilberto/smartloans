@@ -24,7 +24,7 @@ export interface ContractPdfParams {
 
 /** The documents signed at the KYC Contrato step, in signing order. */
 export type KycDocumentId = 'contrato' | 'pagare' | 'resguardo';
-export type KycSignerRole = 'lender' | 'borrower';
+export type KycSignerRole = 'lender' | 'borrower' | 'juridical';
 
 export const KYC_DOCUMENTS: ReadonlyArray<{ id: KycDocumentId; title: string; text: string }> = [
   { id: 'contrato', title: 'Contrato de Crédito', text: CONTRACT_TEXT },
@@ -36,10 +36,13 @@ export const KYC_DOCUMENTS: ReadonlyArray<{ id: KycDocumentId; title: string; te
  * Who signs what:
  *   - Prestamista: one Contrato de Crédito, with GMO Prestamos.
  *   - Prestatario: Contrato de Crédito, Pagaré and Constancia de Resguardo, with the Prestamista.
+ *   - Jurídico: one Contrato de Prestación de Servicios, with GMO Prestamos.
  */
 export const kycDocumentsFor = (role: KycSignerRole) => (role === 'lender'
   ? [{ id: 'contrato' as const, title: 'Contrato de Crédito con GMO Prestamos' }]
-  : KYC_DOCUMENTS.map(({ id, title }) => ({ id, title })));
+  : role === 'juridical'
+    ? [{ id: 'contrato' as const, title: 'Contrato de Servicios con GMO Prestamos' }]
+    : KYC_DOCUMENTS.map(({ id, title }) => ({ id, title })));
 
 /** The document's text with its blanks filled for this signer (see documents/fill.ts). */
 export function kycDocumentText(id: KycDocumentId, data: DocumentFillData): string {
@@ -176,6 +179,25 @@ function buildPdf(id: KycDocumentId, params: ContractPdfParams, acceptanceLine: 
   const y = renderBody(doc, renderHeader(doc, title, params), text);
   renderSignatureAndFooter(doc, y, params, acceptanceLine);
   return toBase64(doc);
+}
+
+/**
+ * Unsigned copy of a KYC document for the signer to keep and read before
+ * accepting: the same filled-in text the "Leer" modal shows, no signature.
+ */
+export function buildKycDocumentPreviewPdf(id: KycDocumentId, title: string, data: DocumentFillData): jsPDF {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.setTextColor(17, 24, 39);
+  doc.text(doc.splitTextToSize(title, pageWidth - MARGIN_X * 2), pageWidth / 2, 20, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(107, 114, 128);
+  doc.text('GMO Prestamos · Copia para lectura, sin firma', pageWidth / 2, 34, { align: 'center' });
+  renderBody(doc, 44, kycDocumentText(id, data));
+  return doc;
 }
 
 export function generateContractPdfBase64(params: ContractPdfParams): string {

@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useHistory, useParams } from 'react-router-dom';
 import { useIonViewWillEnter, useIonViewWillLeave } from '@ionic/react';
 import { useUser } from '../../../contexts/UserContext';
 import { isStaffRole, hasCapability } from '../../../config/rolePermissions';
 import { ClientFollowUp, getAllClientFollowUps } from '../../../api/clientFollowUpApi';
 import { onDataChanged } from '../../../utils/refreshBus';
+import { getAllClientFaceRecognitions } from '../../../api/clientFaceRecognitionApi';
 import { CONTRACT_TEXT } from '../../loans/BorrowerOnboarding/documents/contract';
 import { PAGARE_TEXT } from '../../loans/BorrowerOnboarding/documents/pagare';
+import { JURIDICAL_CONTRACT_TEXT } from '../../loans/BorrowerOnboarding/documents/juridicalContract';
 
 export const LEGAL_TEMPLATES = [
+  { id: 'servicios', title: 'Tu contrato de servicios con GMO Prestamos', text: JURIDICAL_CONTRACT_TEXT },
   { id: 'contrato', title: 'Contrato de crédito personal P2P', text: CONTRACT_TEXT },
   { id: 'pagare',   title: 'Pagaré (LGTOC arts. 170-174)',     text: PAGARE_TEXT },
 ] as const;
@@ -36,6 +39,34 @@ export function useJuridicalDashboard() {
   const [items, setItems] = useState<ClientFollowUp[]>([]);
   const [loading, setLoading] = useState(false);
   const [openTemplate, setOpenTemplate] = useState<LegalTemplate | null>(null);
+  // The services contract with GMO Prestamos, signed in the Expediente wizard
+  // (registerAs 'juridical'). null = not loaded yet, so the card shows a spinner
+  // instead of a "sin firmar" that may be false.
+  const [contract, setContract] = useState<{ signed: boolean; pdfUrl?: string } | null>(null);
+  const history = useHistory();
+
+  const loadContract = useCallback(async () => {
+    if (!companyId || !clientId || !isMember) return;
+    try {
+      const rec = (await getAllClientFaceRecognitions(companyId)).find(f => f.clientId === clientId);
+      setContract({ signed: !!rec?.contractAccepted, pdfUrl: rec?.contractPdfBlobUrl });
+    } catch (e) {
+      console.warn('[JuridicalDashboard] contract status unavailable:', String(e));
+      setContract({ signed: false });
+    }
+  }, [companyId, clientId, isMember]);
+
+  const [signingStarting, setSigningStarting] = useState(false);
+  const startSigning = () => {
+    if (signingStarting || !clientId) return;
+    setSigningStarting(true);
+    history.push('/clientFaceRecognitions', {
+      clientId,
+      continueToPayments: false,
+      returnTo: `/juridical-dashboard/${clientId}`,
+      registerAs: 'juridical',
+    });
+  };
 
   const load = useCallback(async () => {
     if (!companyId || !clientId || !isMember) return;
@@ -49,15 +80,18 @@ export function useJuridicalDashboard() {
     }
   }, [companyId, clientId, isMember]);
 
-  useIonViewWillEnter(() => { load(); });
+  useIonViewWillEnter(() => { load(); loadContract(); setSigningStarting(false); });
   // Ionic keeps this page mounted: close the template viewer when leaving
   // (e.g. switching product) so it doesn't float over the next page.
   useIonViewWillLeave(() => { setOpenTemplate(null); });
-  useEffect(() => onDataChanged(() => { load(); }), [load]);
+  useEffect(() => onDataChanged(() => { load(); loadContract(); }), [load, loadContract]);
 
   const pendingCount = items.filter(i => i.status === 'pending').length;
 
-  return { username, isMember, items, loading, load, pendingCount, openTemplate, setOpenTemplate };
+  return {
+    username, isMember, items, loading, load, pendingCount, openTemplate, setOpenTemplate,
+    contract, startSigning, signingStarting,
+  };
 }
 
 export type JuridicalDashboardVM = ReturnType<typeof useJuridicalDashboard>;

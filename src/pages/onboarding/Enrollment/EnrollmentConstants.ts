@@ -36,7 +36,7 @@ export const ENROLL_OPTIONS: EnrollOption[] = [
     product: 'juridical',
     label: 'Jurídico',
     desc: 'Asesoría legal para acreditados y prestamistas.',
-    next: 'El equipo te asigna casos; los verás en tu panel jurídico.',
+    next: 'Verificarás tu identidad y firmarás tu contrato de servicios; el equipo te asigna casos en tu panel jurídico.',
   },
 ];
 
