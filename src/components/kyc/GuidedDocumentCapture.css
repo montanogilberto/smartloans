@@ -187,3 +187,62 @@
   border-radius: 14px;
   z-index: 2;
 }
+
+/* Tap-to-focus ring where the person tapped the card. */
+.gdc-tap-ring {
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  margin: -32px 0 0 -32px;
+  border: 2px solid #facc15;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 5;
+  animation: gdc-tap-ring 0.9s ease-out forwards;
+}
+
+@keyframes gdc-tap-ring {
+  0% { transform: scale(1.4); opacity: 1; }
+  60% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+/* Native-camera variant (NativeDocumentCapture): no live preview, so a
+   centred card illustration and tips sit between the header and the buttons. */
+.gdc-root--native {
+  background: linear-gradient(160deg, #1f2937, #111827);
+}
+
+.gdc-native-body {
+  position: absolute;
+  inset: 88px 16px 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.gdc-native-card {
+  width: 85%;
+  aspect-ratio: 85.6 / 54;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px dashed rgba(255, 255, 255, 0.7);
+  border-radius: 10px;
+}
+
+.gdc-native-tips {
+  margin: 0;
+  padding-left: 18px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.gdc-button-spinner {
+  width: 16px;
+  height: 16px;
+  color: currentColor;
+}

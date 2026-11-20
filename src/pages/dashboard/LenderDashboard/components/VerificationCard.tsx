@@ -19,7 +19,7 @@ const VerificationCard: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
   <IonCard className="ld-card">
     <IonCardHeader><IonCardTitle>Verificación de identidad</IonCardTitle></IonCardHeader>
     <IonCardContent>
-      {vm.faceRecord?.isVerified && vm.faceRecord?.contractAccepted && vm.faceRecord?.pagareAccepted ? (
+      {vm.faceRecord?.isVerified && vm.faceRecord?.contractAccepted ? (
         <div className="ldx-identity-ok">
           <span className="ldx-shield">
             <IonIcon icon={shieldCheckmarkOutline} />

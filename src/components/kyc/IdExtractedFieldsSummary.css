@@ -44,3 +44,114 @@
   color: var(--ion-color-medium, #92949c);
   margin-top: 8px;
 }
+
+/* The agent read this field but is not sure (lowConfidenceFields). */
+.id-extracted-field-check {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #b45309;
+}
+
+/* "Ver credencial": collapsible front/back photos to compare against the fields. */
+.id-credential-panel {
+  margin-bottom: 14px;
+  border: 1px solid var(--ion-color-light-shade, #e0e0e0);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.id-credential-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--ion-color-light, #f4f5f8);
+  color: var(--ion-text-color, #111);
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.id-credential-chevron {
+  margin-left: auto;
+}
+
+.id-credential-images {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  padding: 10px;
+}
+
+.id-credential-side-title {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--ion-color-medium, #92949c);
+  margin-bottom: 4px;
+}
+
+.id-credential-image {
+  width: 100%;
+  border-radius: 8px;
+}
+
+.id-credential-placeholder {
+  padding: 24px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--ion-color-medium, #92949c);
+  background: var(--ion-color-light, #f4f5f8);
+  border-radius: 8px;
+}
+
+/* How many of the fields were read off the INE. */
+.id-read-progress {
+  margin-bottom: 14px;
+}
+
+.id-read-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  margin-bottom: 6px;
+}
+
+.id-read-progress-check {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.id-field-status {
+  vertical-align: -2px;
+  margin-right: 5px;
+  font-size: 0.95rem;
+}
+
+.id-field-status--read { color: var(--ion-color-success, #2dd36f); }
+.id-field-status--check { color: #b45309; }
+.id-field-status--missing { color: var(--ion-color-medium, #92949c); }
+
+/* Read-only GPS address under Domicilio (INE). */
+.id-gps-address {
+  margin-top: 10px;
+  margin-bottom: 0;
+}
+
+.id-gps-address .id-field-status {
+  color: var(--ion-color-medium);
+}
+
+.id-gps-address .id-extracted-field-input {
+  --background: var(--ion-color-light);
+  opacity: 0.9;
+}
+
+.id-gps-address-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: var(--ion-color-medium);
+}

@@ -9,6 +9,7 @@
  * The entire negotiation is driven by push notifications (payloadJson).
  * Proposals are also persisted via loanProposalApi.
  */
+import { pinnedClientId } from '../../utils/ownClientId';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons,
@@ -184,7 +185,7 @@ import {
 // Banking-first Phase 1: ledger + CLABEs + SPEI orchestrator (mock STP until
 // the contract exists) — replaces the Stripe wallet/withdraw path on this page.
 import {
-  BankAccount, listBankAccounts, ledgerBalance, ledgerStatement, LedgerEntry,
+  BankAccount, listBankAccounts, primaryBankAccount, ledgerBalance, ledgerStatement, LedgerEntry,
   postLedgerEntry, disbursePayment,
   isNonCustodialFundingEnabled, snapshotBankAccountsForLoan, createFundingIntent,
   declareFunding, submitTransferEvidence, revealCounterpartyBankAccount, RevealedBankAccount,
@@ -207,6 +208,7 @@ import { getChatConfig } from '../../api/loanChatApi';
 import { createLoanContract } from '../../api/digitalContractsApi';
 import './P2PLendingPage.css';
 import { API_BASE_URL } from '../../utils/appEnv';
+import SelfieImage from '../../components/ui/SelfieImage';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -259,7 +261,8 @@ const P2PLendingPage: React.FC = () => {
   // contexto de sesión es el fallback.
   const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
   const { clientId: contextClientId, companyId, userId, roleCode, clientCapabilities } = useUser();
-  const clientId = clientIdParam ? Number(clientIdParam) : contextClientId;
+  // Self-service sessions are pinned to their own clientId (utils/ownClientId).
+  const clientId = pinnedClientId(clientIdParam, contextClientId, roleCode);
   console.log('[P2P] render. clientId =', clientId, '(param:', clientIdParam ?? '—', '/ context:', contextClientId, ') companyId =', companyId);
 
   // Determine the role of the logged-in client
@@ -388,7 +391,7 @@ const P2PLendingPage: React.FC = () => {
   // isVerified=1, así que ese fallback mostraba historial como si fuera el
   // destino del dinero. Sin PRIMARY no hay destino válido y el riel SPEI debe
   // quedar cerrado hasta que el cliente vincule/promueva una cuenta.
-  const primaryAccount = bankAccounts.find(a => a.isVerified && a.isDefault) ?? null;
+  const primaryAccount = primaryBankAccount(bankAccounts);
   const hasVerifiedAccount = primaryAccount !== null;
 
   // ── load data ───────────────────────────────────────────────────────────
@@ -639,7 +642,6 @@ const P2PLendingPage: React.FC = () => {
     }));
     try {
       const lenderClient = clientMap[selectedOffer.lenderId];
-      const borrowerName = myClient ? `${myClient.first_name} ${myClient.last_name}` : 'Prestatario';
 
       // 1. Persist proposal — MUST succeed before notifying the lender.
       // Previously .catch(() => {}) swallowed failures here, so a lender could
@@ -653,23 +655,7 @@ const P2PLendingPage: React.FC = () => {
       });
       console.log('[P2P] submitProposal: proposal persisted — notifying lender');
 
-      // 2. Push notification to the lender
-      await createPushNotification({
-        companyId,
-        title: `📋 Nueva solicitud de ${borrowerName}`,
-        message: `${borrowerName} solicita ${fmt(amount)} a una tasa del ${rate}% anual a ${term} meses. Toca para revisar.`,
-        notificationType: 'Info',
-        priority: 'High',
-        targetType: 'User',
-        targetUserId: selectedOffer.lenderId,
-        navigationRoute: '/p2p-lending',
-        payloadJson: JSON.stringify({
-          type: 'LoanProposal',
-          borrowerId: clientId, borrowerName,
-          lenderId: selectedOffer.lenderId,
-          requestedAmount: amount, proposedRate: rate, termMonths: term,
-        }),
-      });
+      // Push sent by the backend (core push, modules/loanPush.py: 'loan_requested') — RFC-014.
 
       console.log('[P2P] submitProposal: SUCCESS — push sent to lender', selectedOffer.lenderId);
       showToast(`✓ Solicitud enviada a ${lenderClient?.first_name ?? 'prestamista'}`);
@@ -740,7 +726,7 @@ const P2PLendingPage: React.FC = () => {
       // "una verificada". Una cuenta ARCHIVED llega con isVerified=1 y pasaba
       // este check, pero snapshot_for_loan la excluye (sólo acepta PRIMARY) —
       // el préstamo se aprobaba y reventaba después, al fondear.
-      const borrowerPrimary = borrowerAccounts.find(a => a.isVerified && a.isDefault) ?? null;
+      const borrowerPrimary = primaryBankAccount(borrowerAccounts);
       const borrowerHasClabe = borrowerPrimary !== null;
       console.log('[P2P] acceptProposal: preconditions', JSON.stringify({
         borrowerHasClabe, borrowerHasCard: !!borrowerCard?.stripePaymentMethodId, lenderSpei: speiBalance,
@@ -826,29 +812,8 @@ const P2PLendingPage: React.FC = () => {
           console.log('[P2P] acceptProposal: offer bookkeeping (no-custodio) FAILED —', String(e));
         }
 
-        const borrowerClientNC = clientMap[borrowerId];
-        await createPushNotification({
-          companyId,
-          title: '✅ ¡Solicitud aprobada!',
-          message: `Tu préstamo de ${fmt(requestedAmount)} a ${proposedRate}% anual fue aprobado. El prestamista debe enviarte el SPEI — te avisaremos para que confirmes la recepción.`,
-          notificationType: 'Success',
-          priority: 'Critical',
-          targetType: 'User',
-          targetUserId: borrowerId,
-          navigationRoute: '/loans',
-          payloadJson: JSON.stringify({ type: 'ProposalAccepted', proposalId }),
-        });
-        await createPushNotification({
-          companyId,
-          title: '💸 Envía el fondeo por SPEI',
-          message: `Transfiere ${fmt(requestedAmount)} a la CLABE del prestatario desde tu banco, luego declara la transferencia en la app.`,
-          notificationType: 'Info',
-          priority: 'Critical',
-          targetType: 'User',
-          targetUserId: lenderId,
-          navigationRoute: '/p2p-lending',
-          payloadJson: JSON.stringify({ type: 'FundingPendingDeclare', loanId: loan.loanId }),
-        }).catch(() => {});
+        // Push sent by the backend (core push, modules/loanPush.py: 'loan_approved_borrower') — RFC-014.
+        // Push sent by the backend (core push, modules/loanPush.py: 'loan_approved_lender') — RFC-014.
 
         console.log('[P2P] acceptProposal: SUCCESS (non-custodial) — loan pending_funding, paymentIntent created');
         notifyDataChanged('proposal_accepted');
@@ -948,17 +913,7 @@ const P2PLendingPage: React.FC = () => {
       }
 
       const borrowerClient = clientMap[borrowerId];
-      await createPushNotification({
-        companyId,
-        title: '✅ ¡Solicitud aprobada!',
-        message: `Tu préstamo de ${fmt(requestedAmount)} a ${proposedRate}% anual fue depositado en tu cuenta bancaria.`,
-        notificationType: 'Success',
-        priority: 'Critical',
-        targetType: 'User',
-        targetUserId: borrowerId,
-        navigationRoute: '/loans',
-        payloadJson: JSON.stringify({ type: 'ProposalAccepted', proposalId }),
-      });
+      // Push sent by the backend (core push, modules/loanPush.py: 'loan_approved_borrower') — RFC-014.
 
       console.log('[P2P] acceptProposal: SUCCESS — loan created + schedule generated + proposal accepted');
       showToast(`✓ Préstamo aprobado y depositado — ${fmt(requestedAmount)} para ${borrowerClient?.first_name ?? 'prestatario'}`);
@@ -1046,14 +1001,7 @@ const P2PLendingPage: React.FC = () => {
         });
       } else {
         showToast('Comprobante subido — la revisión automática encontró diferencias y quedó pendiente de revisión manual.');
-        await createPushNotification({
-          companyId,
-          title: '🔎 Revisa el comprobante de fondeo',
-          message: `El comprobante subido para el préstamo de ${fmt(fundingToDeclare.amountMXN)} necesita revisión antes de confirmar la recepción.${verdict?.overallAssessment ? ' ' + verdict.overallAssessment : ''}`,
-          notificationType: 'Warning', priority: 'High', targetType: 'User', targetUserId: fundingToDeclare.borrowerClientId,
-          navigationRoute: `/loan-detail/${fundingToDeclare.loanId}`,
-          payloadJson: JSON.stringify({ type: 'FundingEvidenceNeedsReview', loanId: fundingToDeclare.loanId, transferEvidenceId: evidence.transferEvidenceId }),
-        }).catch(() => {});
+        // Push sent by the backend (core push, modules/loanPush.py: 'funding_evidence_review') — RFC-014.
       }
     } catch (e) {
       console.log('[P2P] evidence validation FAILED (non-fatal) —', String(e));
@@ -1114,17 +1062,7 @@ const P2PLendingPage: React.FC = () => {
         status: 'rejected', respondedAt: new Date().toISOString(),
       }).catch((e) => console.log('[P2P] rejectProposal: status update FAILED —', String(e)));
 
-      await createPushNotification({
-        companyId,
-        title: '❌ Solicitud no aprobada',
-        message: `Tu solicitud de ${fmt(selectedProposal.requestedAmount)} no fue aprobada en este momento. Puedes intentar con otros prestamistas.`,
-        notificationType: 'Warning',
-        priority: 'Normal',
-        targetType: 'User',
-        targetUserId: selectedProposal.borrowerId,
-        navigationRoute: '/p2p-lending',
-        payloadJson: JSON.stringify({ type: 'ProposalRejected', proposalId: selectedProposal.proposalId }),
-      });
+      // Push sent by the backend (core push, modules/loanPush.py: 'loan_rejected') — RFC-014.
 
       console.log('[P2P] rejectProposal: SUCCESS — borrower notified');
       showToast('Solicitud rechazada y notificación enviada');
@@ -1159,17 +1097,7 @@ const P2PLendingPage: React.FC = () => {
         respondedAt: new Date().toISOString(),
       });
 
-      await createPushNotification({
-        companyId,
-        title: '🔄 Nuevos términos propuestos',
-        message: `El prestamista propone ${fmt(amount)} a ${rate}% anual por ${term} meses. Revisa y responde.`,
-        notificationType: 'Info',
-        priority: 'High',
-        targetType: 'User',
-        targetUserId: selectedProposal.borrowerId,
-        navigationRoute: '/p2p-lending',
-        payloadJson: JSON.stringify({ type: 'ProposalCountered', proposalId: selectedProposal.proposalId }),
-      }).catch(() => {});
+      // Push sent by the backend (core push, modules/loanPush.py: 'loan_countered') — RFC-014.
 
       console.log('[P2P] submitCounterOffer: SUCCESS');
       showToast('✓ Contraoferta enviada — el prestatario debe responder');
@@ -1192,17 +1120,7 @@ const P2PLendingPage: React.FC = () => {
       // grabados, así que el lender ve la solicitud de nuevo en su bandeja
       // con los términos correctos, lista para Aprobar (fondear).
       await updateLoanProposal(p.proposalId, { status: 'pending', respondedAt: new Date().toISOString() });
-      await createPushNotification({
-        companyId,
-        title: '✅ Términos aceptados',
-        message: `El prestatario aceptó tus nuevos términos (${fmt(p.counteredAmount ?? p.requestedAmount)} · ${p.counteredRate ?? p.proposedRate}% · ${p.counteredTermMonths ?? p.termMonths} m). Apruébalo para fondear.`,
-        notificationType: 'Success',
-        priority: 'High',
-        targetType: 'User',
-        targetUserId: p.lenderId,
-        navigationRoute: '/p2p-lending',
-        payloadJson: JSON.stringify({ type: 'CounterAccepted', proposalId: p.proposalId }),
-      }).catch(() => {});
+      // Push sent by the backend (core push, modules/loanPush.py: 'loan_counter_accepted') — RFC-014.
       console.log('[P2P] acceptCounterOffer: SUCCESS');
       showToast('✓ Aceptaste los nuevos términos — el prestamista debe aprobar para fondear');
       notifyDataChanged('counter_accepted');
@@ -1217,17 +1135,7 @@ const P2PLendingPage: React.FC = () => {
     console.log('[P2P] rejectCounterOffer: START', JSON.stringify({ proposalId: p.proposalId }));
     try {
       await updateLoanProposal(p.proposalId, { status: 'rejected', respondedAt: new Date().toISOString() });
-      await createPushNotification({
-        companyId,
-        title: '❌ Contraoferta rechazada',
-        message: 'El prestatario rechazó tus nuevos términos.',
-        notificationType: 'Warning',
-        priority: 'Normal',
-        targetType: 'User',
-        targetUserId: p.lenderId,
-        navigationRoute: '/p2p-lending',
-        payloadJson: JSON.stringify({ type: 'CounterRejected', proposalId: p.proposalId }),
-      }).catch(() => {});
+      // Push sent by the backend (core push, modules/loanPush.py: 'loan_counter_rejected') — RFC-014.
       console.log('[P2P] rejectCounterOffer: SUCCESS');
       showToast('Contraoferta rechazada');
       notifyDataChanged('counter_rejected');
@@ -1628,7 +1536,7 @@ const P2PLendingPage: React.FC = () => {
                   <IonCard key={offer.offerId} className="p2p-offer-card">
                     <div className="p2p-offer-header">
                       {lenderBio?.clientSelfieBlobUrl
-                        ? <IonAvatar className="p2p-offer-avatar"><img src={lenderBio.clientSelfieBlobUrl} alt="lender" /></IonAvatar>
+                        ? <IonAvatar className="p2p-offer-avatar"><SelfieImage url={lenderBio.clientSelfieBlobUrl} alt="lender" /></IonAvatar>
                         : <IonAvatar className="p2p-offer-avatar-placeholder"><IonIcon icon={personOutline} /></IonAvatar>}
                       <div className="p2p-offer-info">
                         <p className="p2p-offer-name">{lender ? `${lender.first_name} ${lender.last_name}` : `Prestamista #${offer.lenderId}`}</p>

@@ -3,6 +3,7 @@ import { IonBadge, IonButton, IonCard, IonCardContent, IonIcon, IonSpinner } fro
 import { cardOutline, chevronForwardOutline, walletOutline } from 'ionicons/icons';
 import { ProfileVM } from '../ProfileLogic';
 import { p2pLendingRoute } from '../../../../utils/routes';
+import { primaryBankAccount } from '../../../../api/bankingApi';
 
 /**
  * Cuentas de pago — resumen de los DOS rieles (CLABE/SPEI vía bankAccounts +
@@ -11,11 +12,10 @@ import { p2pLendingRoute } from '../../../../utils/routes';
  * flujo NativeConnectOnboarding — no se duplica esa UI aquí.
  */
 const BankAccountsCard: React.FC<{ vm: ProfileVM }> = ({ vm }) => {
-  // Misma regla que P2PLendingPage: sólo la Principal cuenta como cuenta
-  // activa. Sin PRIMARY se cae a la más reciente pero se marca "Pendiente" —
-  // una cuenta ARCHIVED llega con isVerified=1 y no debe presentarse como
-  // verificada (D18).
-  const primaryClabe = vm.bankAccounts.find(a => a.isVerified && a.isDefault);
+  // Misma regla que todas las pantallas (bankingApi.primaryBankAccount): sólo
+  // la Principal verificada cuenta como activa. Sin ella se cae a la más
+  // reciente pero se marca "Pendiente".
+  const primaryClabe = primaryBankAccount(vm.bankAccounts);
   const defaultClabe = primaryClabe ?? vm.bankAccounts[0];
   const clabeIsActive = !!primaryClabe;
 

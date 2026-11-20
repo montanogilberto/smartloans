@@ -1,0 +1,18 @@
+# PROD — every push to `main` deploys to the PROD Static Web App.
+# Needs repo secret AZURE_SWA_TOKEN_PROD (deploy is skipped with a warning until it exists).
+name: Deploy PROD (main)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-swa.yml
+    with:
+      environment: production
+      app_env: prod
+      token_secret: AZURE_SWA_TOKEN_PROD
+    secrets: inherit

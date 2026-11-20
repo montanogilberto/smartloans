@@ -1,7 +1,10 @@
 import { ProductContext, productLandingRoute } from './productContext';
 
 /** The products this app serves. A login can also hold POS / Factory AI — those live in other apps. */
-export const SMARTLOANS_PRODUCTS: readonly ProductContext[] = ['borrower', 'lender', 'juridical'];
+export const SMARTLOANS_PRODUCTS: readonly ProductContext[] = ['admin', 'borrower', 'lender', 'juridical'];
+
+/** The ones a client can enroll in from /registro (admin is assigned, never chosen). */
+export const ENROLLABLE_PRODUCTS: readonly ProductContext[] = ['borrower', 'lender', 'juridical'];
 
 export const isSmartLoansProduct = (p: ProductContext | null | undefined): p is ProductContext =>
   !!p && SMARTLOANS_PRODUCTS.includes(p);

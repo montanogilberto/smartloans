@@ -2,10 +2,12 @@ import React, { createContext, useContext, useEffect, useMemo, useState, ReactNo
 import { RoleCode, normalizeRoleCode, loadRoleCatalog } from '../config/rolePermissions';
 import { DEFAULT_AVATAR_URL } from '../utils/formatters';
 import { SMARTLOANS_COMPANY_ID } from '../config/appCompany';
-import { ClientType } from '../api/clientsApi';
+import { ClientType, getOneClient } from '../api/clientsApi';
+import { isPlatformAdminPhone } from '../utils/platformAdmin';
 import { listClientCapabilities } from '../api/clientCapabilitiesApi';
 import { getOneCompany } from '../api/companiesApi';
 import { ProductContext, availableProducts, defaultProduct } from '../utils/productContext';
+import { smartLoansProductFor } from '../utils/smartLoansLanding';
 import { SESSION_EXPIRED_EVENT, clearSessionTokens } from '../utils/sessionTokens';
 
 // ── Storage key ────────────────────────────────────────────────────────────
@@ -35,6 +37,11 @@ export interface AuthData {
   clientCapabilitiesKey?: string;
   roleCode: RoleCode;
   roleName: string;
+  /** clients.cellphone of this session's client — decides the platform admin
+   * (utils/platformAdmin.ts). Read from the client record, never from input. */
+  cellphone?: string;
+  /** clientId the cellphone above was read for. */
+  cellphoneClientId?: number;
   /** Product the user last switched to (self-service sessions only). */
   activeProduct?: ProductContext | null;
 }
@@ -57,6 +64,8 @@ interface UserContextProps extends AuthData {
   setActiveProduct: (product: ProductContext) => void;
   /** Re-read clientCapabilities after a grant/revoke (e.g. self-enrollment). */
   refreshCapabilities: () => Promise<string[]>;
+  /** The GMO Prestamos platform administrator (one phone, config/appCompany.ts). */
+  isPlatformAdmin: boolean;
 }
 
 // ── Defaults ───────────────────────────────────────────────────────────────
@@ -183,6 +192,30 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return () => { cancelled = true; };
   }, [auth.isAuthenticated, auth.companyId, auth.companyName]);
 
+  // The admin is decided by the client record's phone, so it is read from the
+  // backend once per clientId (a stale or edited value for another client is ignored).
+  useEffect(() => {
+    if (!auth.isAuthenticated || !auth.clientId || auth.cellphoneClientId === auth.clientId) return;
+    let cancelled = false;
+    getOneClient({ clients: [{ clientId: auth.clientId }] })
+      .then(rows => {
+        if (cancelled) return;
+        const cellphone = rows[0]?.cellphone ?? '';
+        setAuth(prev => {
+          if (prev.clientId !== auth.clientId) return prev;
+          const next = { ...prev, cellphone, cellphoneClientId: auth.clientId };
+          persistAuth(next);
+          return next;
+        });
+      })
+      .catch(err => console.warn('[UserContext] client phone failed:', err));
+    return () => { cancelled = true; };
+  }, [auth.isAuthenticated, auth.clientId, auth.cellphoneClientId]);
+
+  const isPlatformAdmin = auth.isAuthenticated
+    && auth.cellphoneClientId === auth.clientId
+    && isPlatformAdminPhone(auth.cellphone);
+
   const refreshCapabilities = async (): Promise<string[]> => {
     if (!auth.companyId || !auth.clientId) return [];
     const key = `${auth.companyId}:${auth.clientId}`;
@@ -231,13 +264,18 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const products = useMemo(
-    () => (auth.isAuthenticated ? availableProducts(auth.roleCode, auth.clientCapabilities) : []),
-    [auth.isAuthenticated, auth.roleCode, auth.clientCapabilities],
+    () => (auth.isAuthenticated ? availableProducts(auth.roleCode, auth.clientCapabilities, isPlatformAdmin) : []),
+    [auth.isAuthenticated, auth.roleCode, auth.clientCapabilities, isPlatformAdmin],
   );
-  const effectiveProduct: ProductContext | null =
+  const heldProduct: ProductContext | null =
     auth.activeProduct && products.includes(auth.activeProduct)
       ? auth.activeProduct
       : defaultProduct(auth.roleCode, products);
+  // GMO Prestamos only serves its own products: a session still on 'pos' (a
+  // POS/Rewards account, or a session saved before /inicio switched it) runs
+  // as the first lending product it holds. Tab bar, Header and side menu all
+  // read this — reloading straight onto a deep link must not lose them.
+  const effectiveProduct: ProductContext | null = smartLoansProductFor(products, heldProduct) ?? heldProduct;
 
   const setActiveProduct = (activeProduct: ProductContext) => {
     setAuth((prev) => {
@@ -277,6 +315,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         activeProduct: effectiveProduct,
         setActiveProduct,
         refreshCapabilities,
+        isPlatformAdmin,
       }}
     >
       {children}

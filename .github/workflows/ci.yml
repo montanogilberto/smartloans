@@ -1,0 +1,57 @@
+# CI — type-check, unit tests and build on every PR and every push to an env branch.
+# Also enforces the promotion path (feature/* → development → qa → main).
+# Make "CI / build" and "CI / promotion-path" required checks in branch protection
+# for qa and main.
+name: CI
+
+on:
+  pull_request:
+    branches: [development, qa, main]
+  push:
+    branches: [development, qa, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  promotion-path:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check source branch
+        env:
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+        run: |
+          echo "PR: $HEAD → $BASE"
+          if [ "$BASE" = "qa" ] && [ "$HEAD" != "development" ]; then
+            echo "::error::Only development can be merged into qa (got $HEAD)."; exit 1
+          fi
+          if [ "$BASE" = "main" ] && [ "$HEAD" != "qa" ] && [[ "$HEAD" != hotfix/* ]]; then
+            echo "::error::Only qa (or hotfix/*) can be merged into main (got $HEAD)."; exit 1
+          fi
+          echo "OK"
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: npx vitest run
+
+      - name: Type-check and build
+        run: npm run build

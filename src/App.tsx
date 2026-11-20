@@ -18,10 +18,12 @@ import P2PLendingPage from './pages/loans/P2PLendingPage';
 import LoanChatPage from './pages/loans/LoanChatPage';
 import JuridicalDashboardPage from './pages/juridical/JuridicalDashboardPage';
 import InvitePage from './pages/invite/InvitePage';
+import AdminPage from './pages/admin/AdminPage';
 import ClientDashboardPage from './pages/clients/ClientDashboardPage';
 import BorrowerOnboardingPage from './pages/loans/BorrowerOnboardingPage';
 import LoanPaymentPage from './pages/loans/LoanPaymentPage';
 import { useUser } from './contexts/UserContext';
+import { actsAsLender } from './utils/productContext';
 import LoanChatListPage from './pages/loans/LoanChatListPage';
 import ExpedienteDigitalPage from './pages/clients/ExpedienteDigitalPage';
 import PageLoading from './components/ui/PageLoading';
@@ -71,10 +73,12 @@ const ToInicio: React.FC = () => {
 // client, the same state the dashboards pass, instead of editing the copied callers.
 const ToIdentityVerification: React.FC = () => {
   const history = useHistory();
-  const { clientId } = useUser();
+  const { clientId, roleCode, activeProduct } = useUser();
   useEffect(() => {
-    history.replace('/clientFaceRecognitions', { clientId, continueToPayments: true });
-  }, [history, clientId]);
+    // Registering as the product the session is in (lender vs borrower documents).
+    const registerAs = actsAsLender(roleCode, activeProduct) ? 'lender' : 'borrower';
+    history.replace('/clientFaceRecognitions', { clientId, continueToPayments: true, registerAs });
+  }, [history, clientId, roleCode, activeProduct]);
   return null;
 };
 
@@ -111,6 +115,8 @@ const App: React.FC = () => (
             <PrivateRoute exact path="/client-face-recognition" component={ToIdentityVerification} />
             <PrivateRoute exact path="/clientFaceRecognitions" component={ClientFaceRecognitionPage} />
             <PrivateRoute exact path="/client-expediente/:clientId" component={ExpedienteDigitalPage} />
+            {/* GMO Prestamos platform admin (one phone — config/appCompany.ts). */}
+            <PrivateRoute exact path="/admin/:section?" component={AdminPage} />
             <PrivateRoute exact path="/rewards" component={InvitePage} />
             <PrivateRoute exact path="/loan-chats" component={LoanChatListPage} />
             <PrivateRoute exact path="/profile" component={ProfilePage} />

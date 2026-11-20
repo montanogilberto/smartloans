@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
+import { savePdf } from './savePdf';
 
 export interface ClientQrPdfParams {
   clientId: number;
@@ -61,5 +62,5 @@ export async function downloadClientQrPdf({
   doc.text(`ID: ${clientId}`, pageWidth / 2, y, { align: 'center' });
 
   const safeName = fullName.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'cliente';
-  doc.save(`cliente-qr-${clientId}-${safeName}.pdf`);
+  await savePdf(doc, `cliente-qr-${clientId}-${safeName}.pdf`);
 }

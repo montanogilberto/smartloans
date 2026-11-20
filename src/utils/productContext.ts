@@ -9,7 +9,7 @@ import { RoleCode, isStaffRole, hasCapability } from '../config/rolePermissions'
  * Staff roles never get a product context: their shell is the company POS
  * and is decided by roleCode alone.
  */
-export type ProductContext = 'pos' | 'borrower' | 'lender' | 'juridical' | 'factory';
+export type ProductContext = 'pos' | 'borrower' | 'lender' | 'juridical' | 'factory' | 'admin';
 
 export const PRODUCT_LABELS: Record<ProductContext, string> = {
   pos:      'POS GMO',
@@ -17,15 +17,20 @@ export const PRODUCT_LABELS: Record<ProductContext, string> = {
   lender:   'GMO Prestamos · Prestamista',
   juridical: 'GMO Prestamos · Jurídico',
   factory:  'Factory AI Software',
+  admin:    'GMO Prestamos · Administrador',
 };
 
 /** Products this self-service session can switch between (empty for staff). */
 export const availableProducts = (
   roleCode: RoleCode | string | undefined,
   capabilities: readonly string[] | undefined,
+  /** The GMO Prestamos platform admin (see utils/platformAdmin.ts). */
+  isPlatformAdmin = false,
 ): ProductContext[] => {
-  if (isStaffRole(roleCode)) return [];
   const list: ProductContext[] = [];
+  // First: the admin lands on the admin dashboard (defaultProduct / smartLoansProductFor).
+  if (isPlatformAdmin) list.push('admin');
+  if (isStaffRole(roleCode)) return list;
   if (roleCode === 'pos' || ['POS', 'REWARDS', 'ARCADE'].some(c => hasCapability(capabilities, c))) list.push('pos');
   if (roleCode === 'borrower' || hasCapability(capabilities, 'SMARTLOANS_BORROWER')) list.push('borrower');
   if (roleCode === 'lender' || hasCapability(capabilities, 'SMARTLOANS_LENDER')) list.push('lender');
@@ -39,6 +44,7 @@ export const defaultProduct = (
   roleCode: RoleCode | string | undefined,
   available: ProductContext[],
 ): ProductContext | null => {
+  if (available.includes('admin')) return 'admin';
   if (roleCode === 'borrower' || roleCode === 'lender' || roleCode === 'pos') {
     if (available.includes(roleCode)) return roleCode;
   }
@@ -47,6 +53,7 @@ export const defaultProduct = (
 
 /** Landing page of a product's dashboard. */
 export const productLandingRoute = (product: ProductContext, clientId: number): string => {
+  if (product === 'admin') return '/admin';
   if (!clientId) return '/dashboard';
   if (product === 'lender') return `/lender-dashboard/${clientId}`;
   if (product === 'borrower') return `/client-dashboard/${clientId}`;

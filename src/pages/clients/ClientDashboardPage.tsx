@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { pinnedClientId } from '../../utils/ownClientId';
 import { useParams, useHistory, useLocation } from 'react-router-dom';
 import {
   IonPage,
@@ -64,13 +65,12 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import QRCode from 'qrcode';
 import { useUser } from '../../contexts/UserContext';
-import { hasCapability } from '../../config/rolePermissions';
 import BenefitPicker from '../../components/rewards/BenefitPicker';
 import { ClientDashboard, getAllClientDashboards } from '../../api/clientDashboardApi';
 import { Loan, getAllLoans } from '../../api/loanApi';
 import { countPendingProposalsForBorrower, fetchLoanProposals, MarketplaceProposal } from '../../api/loanMarketplaceApi';
 import { fetchInstallmentSchedule, payInstallmentSpei, Installment } from '../../api/installmentsApi';
-import { ledgerBalance, postLedgerEntry } from '../../api/bankingApi';
+import { ledgerBalance, postLedgerEntry, listBankAccounts, BankAccount, primaryBankAccount as findPrimaryBankAccount } from '../../api/bankingApi';
 import { p2pLendingRoute } from '../../utils/routes';
 
 // Muestra el simulador de depósito SPEI (igual que P2PLendingPage) — apagar
@@ -86,7 +86,7 @@ const SHOW_STRIPE_RAIL = false;
 import { getAllClientFaceRecognitions, upsertClientFaceRecognition, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
 import { Client, getOneClient, createOrUpdateClient, uploadClientQr, fetchClientQr } from '../../api/clientsApi';
 import { getStripeAccountStatus, createOrRefreshStripeAccount } from '../../api/stripeApi';
-import LoanCompletionRing, { LoanStep } from '../../components/loans/LoanCompletionRing';
+import SetupStepsCard, { SetupStep, summarizeSetup } from '../../components/ui/SetupStepsCard';
 import NativeConnectOnboarding from '../../components/payments/NativeConnectOnboarding';
 import BankAccountLink from '../../components/payments/BankAccountLink';
 import { buildKycPrefill, kycFieldsToIne } from '../../utils/kycPrefill';
@@ -200,7 +200,7 @@ const ClientDashboardPage: React.FC = () => {
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
   const history = useHistory();
   const location = useLocation();
-  const { companyId, clientId: contextClientId, username, avatarUrl, setAvatarUrl, roleCode, clientType, clientCapabilities } = useUser();
+  const { companyId, clientId: contextClientId, username, avatarUrl, setAvatarUrl, roleCode } = useUser();
   // Foto de cuenta (users.imageUrl) — distinta de la selfie biométrica KYC
   // (clientFaceRecognitions.clientSelfieBlobUrl), así que sí se puede
   // reemplazar con cualquier foto. setAvatarUrl solo actualiza esta sesión;
@@ -217,12 +217,8 @@ const ClientDashboardPage: React.FC = () => {
     setAvatarUrl(dataUrl);
     console.log('[ClientDashboard] avatar picker → actualizado (solo local, NO persistido en backend)');
   };
-  // A lender/payout client's payment step IS a Stripe payout account (needs an
-  // external bank). A borrower's is the repayment CARD — they are never asked
-  // for a payout account, so the checklist must not gate them on one.
-  const isPayoutClient = hasCapability(clientCapabilities, 'SMARTLOANS_LENDER')
-    || clientType === 'lender' || clientType === 'both' || roleCode === 'lender';
-  const clientId = clientIdParam ? Number(clientIdParam) : contextClientId;
+  // Self-service sessions are pinned to their own clientId (utils/ownClientId).
+  const clientId = pinnedClientId(clientIdParam, contextClientId, roleCode);
 
   console.log('[ClientDashboard] render. clientId =', clientId, 'companyId =', companyId, 'tab query =', location.search);
 
@@ -258,6 +254,12 @@ const ClientDashboardPage: React.FC = () => {
   const [proposalsLoading, setProposalsLoading] = useState(false);
   // Face recognition / completion
   const [faceRecord, setFaceRecord] = useState<ClientFaceRecognition | null>(null);
+  // Primeros pasos reads these three; each flag flips once its first fetch
+  // finishes (ok or not) so the card never shows "0%" before the data is in.
+  const [faceRecordLoaded, setFaceRecordLoaded] = useState(false);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [bankAccountsLoaded, setBankAccountsLoaded] = useState(false);
+  const [loansLoaded, setLoansLoaded] = useState(false);
   // Solicitudes P2P propias aún sin respuesta — banner en el home.
   const [myPendingProposals, setMyPendingProposals] = useState(0);
   // Cuotas SPEI: calendario de pagos + saldo de billetera del borrower.
@@ -283,7 +285,6 @@ const ClientDashboardPage: React.FC = () => {
   const [qrDownloading, setQrDownloading] = useState(false);
   // Signed GMO1 value, under the client's own companyId (see ensureQrGenerated).
   const clientQr = useClientQr(clientRecord?.companyId ?? companyId, clientRecord?.clientId);
-  const [qrGenerating, setQrGenerating] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
 
@@ -368,7 +369,26 @@ const ClientDashboardPage: React.FC = () => {
       console.error('[ClientDashboard] fetchLoans ❌', err);
     } finally {
       setLoansLoading(false);
+      setLoansLoaded(true);
     }
+  };
+
+  // Identity record + CLABEs — what Primeros pasos steps 1 and 2 check. Also
+  // re-run on view re-entry, so returning from the wizard ticks the step.
+  const fetchSetupSources = () => {
+    if (!companyId || !clientId) return;
+    getAllClientFaceRecognitions(companyId)
+      .then(records => {
+        const r = records.find(x => x.clientId === Number(clientId));
+        console.log('[ClientDashboard] faceRecord =', r ? { id: r.clientFaceRecognitionId, isVerified: r.isVerified } : null);
+        setFaceRecord(r ?? null);
+      })
+      .catch((e) => console.log('[ClientDashboard] faceRecord ❌', String(e)))
+      .finally(() => setFaceRecordLoaded(true));
+    listBankAccounts(companyId, Number(clientId))
+      .then(setBankAccounts)
+      .catch((e) => console.log('[ClientDashboard] bankAccounts ❌', String(e)))
+      .finally(() => setBankAccountsLoaded(true));
   };
 
   // ── Fetch this borrower's proposal history (pending/countered/rejected/…) ─
@@ -495,16 +515,6 @@ const ClientDashboardPage: React.FC = () => {
     }
   };
 
-  const handleGenerateQr = async () => {
-    if (qrGenerating) return;
-    setQrGenerating(true);
-    try {
-      if (await ensureQrGenerated()) setShowQrModal(true);
-    } finally {
-      setQrGenerating(false);
-    }
-  };
-
   // Borrower onboarding — QR (silent, if missing) → document + biometric
   // capture + contract → payment step.
   //
@@ -521,7 +531,7 @@ const ClientDashboardPage: React.FC = () => {
     setWizardStarting(true);
     try {
       await ensureQrGenerated();
-      history.push('/clientFaceRecognitions', { clientId, continueToPayments: true });
+      history.push('/clientFaceRecognitions', { clientId, continueToPayments: true, registerAs: 'borrower' });
     } finally {
       setWizardStarting(false);
     }
@@ -620,13 +630,7 @@ const ClientDashboardPage: React.FC = () => {
         .catch(() => setMyPendingProposals(0));
     }
     if (companyId && clientId) {
-      getAllClientFaceRecognitions(companyId)
-        .then(records => {
-          const r = records.find(x => x.clientId === Number(clientId));
-          console.log('[ClientDashboard] initial-load effect: faceRecord =', r ?? null);
-          setFaceRecord(r ?? null);
-        })
-        .catch(() => {});
+      fetchSetupSources();
       refreshClientRecord();
       // Repayment card on file — feeds the payment-method tiles in the credit
       // card. Best-effort: no card just shows the "add" tile.
@@ -657,6 +661,7 @@ const ClientDashboardPage: React.FC = () => {
       fetchLoans();
       fetchProposals();
       fetchStripe();
+      fetchSetupSources();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, clientId]);
@@ -671,6 +676,7 @@ const ClientDashboardPage: React.FC = () => {
     fetchLoans();
     fetchProposals();
     fetchStripe();
+    fetchSetupSources();
     countPendingProposalsForBorrower(companyId, Number(clientId))
       .then(setMyPendingProposals)
       .catch(() => {});
@@ -786,36 +792,58 @@ const ClientDashboardPage: React.FC = () => {
       .catch((e) => console.log('[ClientDashboard] fetchAvailableCredit ❌ network/CORS', String(e)));
   }, [companyId, clientId]);
 
-  // Biométrico/Contrato/Pagaré/Cuenta de pago are one continuous process
-  // (document capture → verification → contract → bank account, all inside
-  // ClientFaceRecognitionPage's own multi-step wizard) — so all four launch
-  // the same handleStartWizard rather than sending the client to four
-  // different disconnected places. Código QR stays separate: it's a single
-  // instant action (view/download), not part of that camera+Stripe flow.
-  const loanSteps: LoanStep[] = [
-    { label: 'Información general', done: true },
-    {
-      label: 'Código QR',
-      done: !!clientRecord?.qrBlobUrl,
-      onClick: handleGenerateQr,
-    },
-    {
-      // Borrower: the repayment card (savedCard). Lender/payout client: the
-      // Stripe payout account's external bank. Mirrors the wizard, which labels
-      // step 5 "Tarjeta" for borrowers and "Cuenta de pago" for payout clients.
-      label: isPayoutClient ? 'Cuenta de pago' : 'Tarjeta',
-      done: isPayoutClient ? !!stripeAccount?.hasExternalAccount : !!savedCard,
-      onClick: handleStartWizard,
-    },
-    {
-      label: 'Biométrico',
-      done: !!faceRecord?.isVerified,
-      onClick: handleStartWizard,
-    },
-    { label: 'Contrato', done: !!faceRecord?.contractAccepted, onClick: handleStartWizard },
-    { label: 'Pagaré',   done: !!faceRecord?.pagareAccepted,   onClick: handleStartWizard },
+  // ── Primeros pasos: what a new borrower must finish before borrowing ─────
+  // Same card and rules as the lender dashboard:
+  // 1) identity: INE + selfie + presence + biometric + contract + pagaré, all
+  //    in the ClientFaceRecognitionPage wizard (partial credit per piece);
+  // 2) a verified PRIMARY CLABE — where the lender deposits the loan by SPEI
+  //    (shared rule: bankingApi.primaryBankAccount);
+  // 3) a loan requested (a sent solicitud or a loan already exists).
+  const kycPieces = [
+    !!faceRecord?.idFrontImageBlobUrl,
+    !!faceRecord?.clientSelfieBlobUrl,
+    !!faceRecord?.presenceVideoBlobUrl,
+    !!faceRecord?.isVerified,
+    !!faceRecord?.contractAccepted,
+    !!faceRecord?.pagareAccepted,
   ];
-  const loanCompletionPct = Math.round((loanSteps.filter(s => s.done).length / loanSteps.length) * 100);
+  const kycDone = kycPieces.filter(Boolean).length;
+  const identityVerified = !!(faceRecord?.isVerified && faceRecord?.contractAccepted && faceRecord?.pagareAccepted);
+  const primaryBankAccount = findPrimaryBankAccount(bankAccounts);
+  const loanRequested = loans.length > 0 || myPendingProposals > 0;
+  const setupSteps: SetupStep[] = [
+    {
+      id: 'identity',
+      label: 'Verifica tu identidad',
+      detail: identityVerified ? 'Identidad verificada' : `${kycDone} de ${kycPieces.length} pasos completados`,
+      done: identityVerified,
+      progress: kycDone / kycPieces.length,
+      cta: kycDone > 0 ? 'Continuar' : 'Verificar',
+      action: handleStartWizard,
+    },
+    {
+      id: 'bank',
+      label: 'Registra tu cuenta bancaria',
+      detail: primaryBankAccount
+        ? `${primaryBankAccount.bankName ?? 'CLABE'} · ····${primaryBankAccount.clabeLast4}`
+        : 'CLABE donde recibirás el dinero de tu préstamo',
+      done: !!primaryBankAccount,
+      cta: 'Registrar',
+      action: () => goTab('payments'),
+    },
+    {
+      id: 'loan',
+      label: 'Solicita tu préstamo',
+      detail: loanRequested
+        ? 'Tu solicitud ya está en el marketplace'
+        : 'Elige una oferta en el marketplace y envía tu solicitud',
+      done: loanRequested,
+      cta: 'Solicitar',
+      action: () => history.push(p2pLendingRoute(clientId)),
+    },
+  ];
+  const setupLoaded = faceRecordLoaded && bankAccountsLoaded && loansLoaded;
+  const setupSummary = summarizeSetup(setupSteps);
 
   const activeLoans = loans.filter(l => normLoanStatus(l.loanStatus) === 'active');
   const paymentActivities = recentActivities.filter(a =>
@@ -934,9 +962,9 @@ const ClientDashboardPage: React.FC = () => {
                 <span className="hero-due">Paga antes del {toDate(financialSummary.nextPaymentDate)}</span>
               )}
             </div>
-            {loanCompletionPct < 100 && (
+            {setupLoaded && setupSummary.pct < 100 && (
               <div className="hero-progress-pill">
-                <span className="hero-progress-pct">{loanCompletionPct}%</span>
+                <span className="hero-progress-pct">{setupSummary.pct}%</span>
                 <span className="hero-progress-label">listo</span>
               </div>
             )}
@@ -1039,37 +1067,14 @@ const ClientDashboardPage: React.FC = () => {
         </IonCardContent>
       </IonCard>
 
-      {/* Loan completion progress */}
-      <IonCard className="client-dashboard-card">
-        <IonCardHeader>
-          <IonCardTitle>Progreso para Préstamo</IonCardTitle>
-        </IonCardHeader>
-        <IonCardContent>
-          {loanCompletionPct === 100 ? (
-            // Steps are already viewable in detail under Mis Datos — once
-            // eligible there's no action left to drive here, so this stays
-            // a status line instead of repeating the full ring + checklist.
-            <div className="loan-progress-complete-row">
-              <IonIcon icon={checkmarkCircle} />
-              Perfil completo — elegible para solicitar préstamo.
-            </div>
-          ) : (
-            <>
-              <LoanCompletionRing percentage={loanCompletionPct} size={96} strokeWidth={7} steps={loanSteps} showSteps />
-              <p style={{ fontSize: 12, color: '#6b7280', marginTop: 12, marginBottom: 0 }}>
-                Completa todos los pasos para acceder al crédito.
-              </p>
-              {(!faceRecord?.isVerified || !faceRecord?.contractAccepted || !faceRecord?.pagareAccepted || !stripeAccount?.hasExternalAccount) && (
-                <IonButton expand="block" shape="round" className="client-dashboard-action-button"
-                  style={{ marginTop: 12 }} disabled={wizardStarting} onClick={handleStartWizard}>
-                  <IonIcon icon={addCircleOutline} slot="start" />
-                  {wizardStarting ? 'Cargando...' : 'Continuar registro'}
-                </IonButton>
-              )}
-            </>
-          )}
-        </IonCardContent>
-      </IonCard>
+      {/* Primeros pasos — same card as the lender dashboard. */}
+      <SetupStepsCard
+        className="client-dashboard-card"
+        loaded={setupLoaded}
+        steps={setupSteps}
+        goal="para solicitar tu préstamo"
+        busyStepId={wizardStarting ? 'identity' : null}
+      />
 
       {/* Quick Actions */}
       <IonCard className="client-dashboard-card quick-actions-card">
@@ -1326,6 +1331,7 @@ const ClientDashboardPage: React.FC = () => {
                 clientId={Number(clientId)}
                 companyId={Number(companyId)}
                 holderName={clientRecord ? `${clientRecord.first_name} ${clientRecord.last_name}` : ''}
+                onChanged={setBankAccounts}
               />
             </IonCardContent>
           </IonCard>
