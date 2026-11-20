@@ -35,6 +35,29 @@ export interface BankAccount {
   accountStatus?: 'PRIMARY' | 'PENDING_VERIFICATION' | 'ARCHIVED';
 }
 
+export type BankAccountBucket = 'primary' | 'pending' | 'archived';
+
+/**
+ * The one rule for "which CLABE receives money" — every screen uses it, so the
+ * tile, the modal and the loan preconditions can never disagree.
+ *
+ * Principal = PRIMARY **and verified**. /bank-account/link inserts through
+ * sp_bankAccounts, which leaves accountStatus at its column default 'PRIMARY'
+ * with isVerified=0 until the micro-deposit centavos are confirmed — so
+ * PRIMARY alone is not a valid money destination. Without accountStatus
+ * (older SP projections), isVerified + isDefault decide.
+ */
+export function bankAccountBucket(a: BankAccount): BankAccountBucket {
+  if (a.accountStatus === 'ARCHIVED') return 'archived';
+  if (a.accountStatus === 'PRIMARY') return a.isVerified ? 'primary' : 'pending';
+  if (a.accountStatus === 'PENDING_VERIFICATION') return 'pending';
+  return a.isVerified && a.isDefault ? 'primary' : 'pending';
+}
+
+export function primaryBankAccount(accounts: BankAccount[]): BankAccount | null {
+  return accounts.find(a => bankAccountBucket(a) === 'primary') ?? null;
+}
+
 export async function linkBankAccount(payload: {
   clientId: number; companyId: number; clabe: string; holderName: string;
 }): Promise<any> {

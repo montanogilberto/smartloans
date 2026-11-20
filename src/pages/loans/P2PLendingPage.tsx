@@ -185,7 +185,7 @@ import {
 // Banking-first Phase 1: ledger + CLABEs + SPEI orchestrator (mock STP until
 // the contract exists) — replaces the Stripe wallet/withdraw path on this page.
 import {
-  BankAccount, listBankAccounts, ledgerBalance, ledgerStatement, LedgerEntry,
+  BankAccount, listBankAccounts, primaryBankAccount, ledgerBalance, ledgerStatement, LedgerEntry,
   postLedgerEntry, disbursePayment,
   isNonCustodialFundingEnabled, snapshotBankAccountsForLoan, createFundingIntent,
   declareFunding, submitTransferEvidence, revealCounterpartyBankAccount, RevealedBankAccount,
@@ -391,7 +391,7 @@ const P2PLendingPage: React.FC = () => {
   // isVerified=1, así que ese fallback mostraba historial como si fuera el
   // destino del dinero. Sin PRIMARY no hay destino válido y el riel SPEI debe
   // quedar cerrado hasta que el cliente vincule/promueva una cuenta.
-  const primaryAccount = bankAccounts.find(a => a.isVerified && a.isDefault) ?? null;
+  const primaryAccount = primaryBankAccount(bankAccounts);
   const hasVerifiedAccount = primaryAccount !== null;
 
   // ── load data ───────────────────────────────────────────────────────────
@@ -726,7 +726,7 @@ const P2PLendingPage: React.FC = () => {
       // "una verificada". Una cuenta ARCHIVED llega con isVerified=1 y pasaba
       // este check, pero snapshot_for_loan la excluye (sólo acepta PRIMARY) —
       // el préstamo se aprobaba y reventaba después, al fondear.
-      const borrowerPrimary = borrowerAccounts.find(a => a.isVerified && a.isDefault) ?? null;
+      const borrowerPrimary = primaryBankAccount(borrowerAccounts);
       const borrowerHasClabe = borrowerPrimary !== null;
       console.log('[P2P] acceptProposal: preconditions', JSON.stringify({
         borrowerHasClabe, borrowerHasCard: !!borrowerCard?.stripePaymentMethodId, lenderSpei: speiBalance,

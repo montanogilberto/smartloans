@@ -108,7 +108,7 @@ import { notifyDataChanged } from '../../utils/refreshBus';
 import { fmtMXN as fmt } from '../../utils/format';
 import { useToast } from '../../hooks/useToast';
 import './LoanPaymentPage.css';
-import { API_BASE_URL, STRIPE_PUBLISHABLE_KEY } from '../../utils/appEnv';
+import { API_BASE_URL, STRIPE_PUBLISHABLE_KEY, STRIPE_KEY_MISSING_MSG } from '../../utils/appEnv';
 
 // ── Stripe publishable key (safe to expose in frontend) ────────────────────
 const STRIPE_PK = STRIPE_PUBLISHABLE_KEY;
@@ -162,6 +162,10 @@ const LoanPaymentPage: React.FC = () => {
   const elementsRef = useRef<StripeElements | null>(null);
   const cardElRef   = useRef<HTMLDivElement>(null);
   const intentIdRef = useRef<string>('');
+  // True only after Stripe's Payment Element fires 'ready'. confirmPayment
+  // with an element that never loaded throws IntegrationError ("elements
+  // should have a mounted Payment Element") — so Pagar stays disabled until then.
+  const [elementReady, setElementReady] = useState(false);
 
   const isTopUp     = mode === 'top_up';
   const isRepayment = mode === 'repayment';
@@ -196,7 +200,16 @@ const LoanPaymentPage: React.FC = () => {
 
   // ── Mount Stripe Payment Element when we reach card step ──────────────
   useEffect(() => {
-    if (step !== 'card' || !stripeRef.current || !cardElRef.current) return;
+    if (step !== 'card' || !cardElRef.current) return;
+    setElementReady(false);
+    // No Stripe.js (key missing from this build, or loadStripe failed): stop
+    // BEFORE creating a PaymentIntent, instead of an orphan intent + a crash.
+    if (!stripeRef.current) {
+      console.log('[Payment] card step: Stripe not initialised', JSON.stringify({ hasKey: !!STRIPE_PK }));
+      setStripeError(STRIPE_PK ? 'No se pudo cargar Stripe. Revisa tu conexión e intenta de nuevo.' : STRIPE_KEY_MISSING_MSG);
+      setStep('error');
+      return;
+    }
 
     (async () => {
       setLoading(true);
@@ -245,6 +258,17 @@ const LoanPaymentPage: React.FC = () => {
           paymentMethodOrder: ['card', 'oxxo'],
         });
 
+        paymentElement.on('ready', () => {
+          console.log('[Payment] Payment Element ready');
+          setElementReady(true);
+        });
+        // e.g. publishable key from a different Stripe account/mode than the
+        // backend that created the intent → Stripe refuses to load the form.
+        paymentElement.on('loaderror', (ev) => {
+          console.log('[Payment] Payment Element loaderror —', JSON.stringify({ type: ev.error?.type, code: ev.error?.code, message: ev.error?.message }));
+          setStripeError('No se pudo cargar el formulario de pago. Intenta de nuevo o contacta a soporte.');
+          setStep('error');
+        });
         paymentElement.mount(cardElRef.current!);
       } catch (e: any) {
         console.log('[Payment] intent/element setup FAILED —', String(e?.message ?? e));
@@ -273,7 +297,7 @@ const LoanPaymentPage: React.FC = () => {
 
   // ── Confirm payment ────────────────────────────────────────────────────
   const handleConfirmPayment = async () => {
-    if (!stripeRef.current || !elementsRef.current || confirming) return;
+    if (!stripeRef.current || !elementsRef.current || !elementReady || confirming) return;
 
     if (await isBiometricLockEnabled()) {
       const confirmed = await authenticateBiometric('Confirma tu identidad para autorizar el pago');
@@ -554,8 +578,8 @@ const LoanPaymentPage: React.FC = () => {
               <span>Pago procesado por Stripe · Tu número de tarjeta nunca llega a nuestros servidores</span>
             </div>
 
-            <IonButton expand="block" onClick={handleConfirmPayment} disabled={loading || confirming}>
-              {confirming
+            <IonButton expand="block" onClick={handleConfirmPayment} disabled={loading || confirming || !elementReady}>
+              {confirming || !elementReady
                 ? <IonSpinner name="dots" />
                 : <>
                     <IonIcon icon={lockClosedOutline} slot="start" />

@@ -70,7 +70,7 @@ import { ClientDashboard, getAllClientDashboards } from '../../api/clientDashboa
 import { Loan, getAllLoans } from '../../api/loanApi';
 import { countPendingProposalsForBorrower, fetchLoanProposals, MarketplaceProposal } from '../../api/loanMarketplaceApi';
 import { fetchInstallmentSchedule, payInstallmentSpei, Installment } from '../../api/installmentsApi';
-import { ledgerBalance, postLedgerEntry, listBankAccounts, BankAccount } from '../../api/bankingApi';
+import { ledgerBalance, postLedgerEntry, listBankAccounts, BankAccount, primaryBankAccount as findPrimaryBankAccount } from '../../api/bankingApi';
 import { p2pLendingRoute } from '../../utils/routes';
 
 // Muestra el simulador de depósito SPEI (igual que P2PLendingPage) — apagar
@@ -796,9 +796,8 @@ const ClientDashboardPage: React.FC = () => {
   // Same card and rules as the lender dashboard:
   // 1) identity: INE + selfie + presence + biometric + contract + pagaré, all
   //    in the ClientFaceRecognitionPage wizard (partial credit per piece);
-  // 2) a verified PRIMARY CLABE — where the lender deposits the loan by SPEI.
-  //    isVerified alone is not enough: an ARCHIVED account can arrive with
-  //    isVerified=1 (D18), so isDefault is required too;
+  // 2) a verified PRIMARY CLABE — where the lender deposits the loan by SPEI
+  //    (shared rule: bankingApi.primaryBankAccount);
   // 3) a loan requested (a sent solicitud or a loan already exists).
   const kycPieces = [
     !!faceRecord?.idFrontImageBlobUrl,
@@ -810,7 +809,7 @@ const ClientDashboardPage: React.FC = () => {
   ];
   const kycDone = kycPieces.filter(Boolean).length;
   const identityVerified = !!(faceRecord?.isVerified && faceRecord?.contractAccepted && faceRecord?.pagareAccepted);
-  const primaryBankAccount = bankAccounts.find(a => a.isVerified && a.isDefault && a.accountStatus !== 'ARCHIVED') ?? null;
+  const primaryBankAccount = findPrimaryBankAccount(bankAccounts);
   const loanRequested = loans.length > 0 || myPendingProposals > 0;
   const setupSteps: SetupStep[] = [
     {

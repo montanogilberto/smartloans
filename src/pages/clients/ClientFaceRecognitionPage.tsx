@@ -48,6 +48,7 @@ import { validateFaceSession, FaceValidationResult } from '../../api/faceValidat
 import { useUser } from '../../contexts/UserContext';
 import { saveProfileImage } from '../../api/usersApi';
 import { Client, getOneClient } from '../../api/clientsApi';
+import { primaryBankAccount } from '../../api/bankingApi';
 import {
   submitContractClientFaceRecognition,
   uploadClientFaceRecognitionImage,
@@ -1947,7 +1948,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
               clientId={deepLinkClientId}
               companyId={companyId}
               holderName={signerName}
-              onChanged={(list) => setHasPrimaryClabe(list.some(a => a.isVerified && a.isDefault && a.accountStatus !== 'ARCHIVED'))}
+              onChanged={(list) => setHasPrimaryClabe(primaryBankAccount(list) !== null)}
             />
             <IonNote style={{ display: 'block', margin: '12px 0', fontSize: 13 }}>
               Tu CLABE se guarda en GMO Prestamos y sólo se muestra a la persona de tu préstamo para que te transfiera por SPEI. GMO Prestamos no recibe ni mueve tu dinero.

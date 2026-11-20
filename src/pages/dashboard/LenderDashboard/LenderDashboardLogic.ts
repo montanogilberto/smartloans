@@ -10,7 +10,7 @@ import { useUser } from '../../../contexts/UserContext';
 import { getAllLoans, Loan } from '../../../api/loanApi';
 import { fetchActiveLoanOffers, countPendingProposalsForLender } from '../../../api/loanMarketplaceApi';
 import { getAllClients, Client } from '../../../api/clientsApi';
-import { ledgerStatement, LedgerEntry, listBankAccounts, BankAccount } from '../../../api/bankingApi';
+import { ledgerStatement, LedgerEntry, listBankAccounts, BankAccount, primaryBankAccount as findPrimaryBankAccount } from '../../../api/bankingApi';
 import { p2pLendingRoute } from '../../../utils/routes';
 import { getAllClientFaceRecognitions, upsertClientFaceRecognition, ClientFaceRecognition } from '../../../api/clientFaceRecognitionApi';
 import { listContractsForClient } from '../../../api/digitalContractsApi';
@@ -287,12 +287,11 @@ export function useLenderDashboard() {
 
   // ── Primeros pasos: what a new lender must finish before lending ──────────
   // 1) identity: same "verified" rule as VerificationCard (biometric + contract + pagaré);
-  // 2) a verified PRIMARY CLABE — isVerified alone is not enough, an ARCHIVED
-  //    account can arrive with isVerified=1 (D18), so isDefault is required too;
+  // 2) a verified PRIMARY CLABE (shared rule: bankingApi.primaryBankAccount);
   // 3) capital published in the marketplace (or already lent: a funded offer
   //    stops counting as published, the loan shows it was done).
   const identityVerified = !!(faceRecord?.isVerified && faceRecord?.contractAccepted);
-  const primaryBankAccount = bankAccounts.find(a => a.isVerified && a.isDefault && a.accountStatus !== 'ARCHIVED') ?? null;
+  const primaryBankAccount = findPrimaryBankAccount(bankAccounts);
   const setupSteps = [
     {
       id: 'identity',
