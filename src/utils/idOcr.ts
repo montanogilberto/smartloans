@@ -152,3 +152,53 @@ export async function extractIneFields(input: IdExtractionInput): Promise<IdExtr
     return EMPTY_RESULT;
   }
 }
+
+/** Where a field's current value came from (kept for logs and the merge rule). */
+export type IdFieldSource = 'ocr' | 'ocr-hires' | 'manual' | 'saved' | 'geo';
+
+export interface IdFieldsState {
+  fields: ExtractedIdFields;
+  /** Fields whose CURRENT value the agent flagged as "read it, verify me". */
+  low: Set<keyof ExtractedIdFields>;
+  source: Partial<Record<keyof ExtractedIdFields, IdFieldSource>>;
+}
+
+/**
+ * Merges a new OCR pass into what we already have, field by field. A later pass
+ * (e.g. the hi-res front) must never make the data worse:
+ * - an empty value never replaces a filled one;
+ * - a value the person typed or corrected ('manual') is never replaced;
+ * - a low-confidence value never replaces a confident one.
+ * Everything else takes the new pass (it is usually from the better image).
+ */
+export function mergeOcrPass(
+  prev: IdFieldsState,
+  next: IdExtractionResult,
+  source: IdFieldSource,
+): IdFieldsState {
+  const fields = { ...prev.fields };
+  const low = new Set(prev.low);
+  const src = { ...prev.source };
+  const nextLow = new Set(next.lowConfidenceFields as (keyof ExtractedIdFields)[]);
+  (Object.keys(next.fields) as (keyof ExtractedIdFields)[]).forEach((k) => {
+    const v = String(next.fields[k] ?? '').trim();
+    if (!v) return;
+    const had = String(prev.fields[k] ?? '').trim();
+    if (had && prev.source[k] === 'manual') return;
+    if (had && !prev.low.has(k) && nextLow.has(k)) return;
+    fields[k] = next.fields[k];
+    src[k] = source;
+    if (nextLow.has(k)) low.add(k); else low.delete(k);
+  });
+  return { fields, low, source: src };
+}
+
+/** Front-side fields a hi-res pass can improve. */
+const FRONT_FIELDS: (keyof ExtractedIdFields)[] = ['nombre', 'curp', 'claveElector', 'fechaNacimiento', 'vigencia'];
+
+/** True when a hi-res re-read is worth a second request: a front field is empty or unsure. */
+export function frontNeedsAnotherPass(state: IdFieldsState): boolean {
+  return FRONT_FIELDS.some((k) => !String(state.fields[k] ?? '').trim() || state.low.has(k));
+}
+
+export const EMPTY_EXTRACTED_ID_FIELDS: ExtractedIdFields = EMPTY_FIELDS;

@@ -9,6 +9,8 @@ interface IdExtractedFieldsSummaryProps {
   onFieldsChange: (fields: ExtractedIdFields) => void;
   ocrLoading: boolean;
   ocrError: string;
+  /** Fields the agent read but is not sure about — shown with "Revisa este dato". */
+  lowConfidence?: (keyof ExtractedIdFields)[];
 }
 
 // Domicilio and Clave de Elector are required on the contract (see
@@ -41,6 +43,7 @@ const IdExtractedFieldsSummary: React.FC<IdExtractedFieldsSummaryProps> = ({
   onFieldsChange,
   ocrLoading,
   ocrError,
+  lowConfidence = [],
 }) => {
   return (
     <div className="id-extracted-fields ion-margin-top">
@@ -70,6 +73,9 @@ const IdExtractedFieldsSummary: React.FC<IdExtractedFieldsSummaryProps> = ({
               onFieldsChange({ ...fields, [key]: DIGIT_FIELDS[key] ? raw.replace(/\D/g, '') : raw });
             }}
           />
+          {!!fields[key] && lowConfidence.includes(key) && (
+            <span className="id-extracted-field-check">Revisa este dato: no se leyó con claridad.</span>
+          )}
         </div>
       ))}
 
