@@ -19,7 +19,7 @@ export function useMyLoans() {
   // client-dashboard / lender-dashboard / p2p-lending), así el link se puede
   // compartir y sobrevive un refresh.
   const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
-  const { clientId: contextClientId, companyId, roleCode, clientCapabilities } = useUser();
+  const { clientId: contextClientId, companyId, roleCode, clientCapabilities, isPlatformAdmin } = useUser();
   // roleCode alone used to gate this (roleCode==='lender'/'borrower' from the
   // password signup flow). A client can now ALSO reach SmartLoans purely via
   // a granted clientCapabilities row (e.g. logged in through /client-login
@@ -35,7 +35,7 @@ export function useMyLoans() {
   // lender/borrower) se queda en la suya — back-office sí puede mirar la de
   // otro cliente.
   const paramId = clientIdParam ? Number(clientIdParam) : null;
-  const foreignId = paramId !== null && paramId !== contextClientId && !isStaffRole(roleCode);
+  const foreignId = paramId !== null && paramId !== contextClientId && !isStaffRole(roleCode) && !isPlatformAdmin;
   const clientId = foreignId ? contextClientId : (paramId ?? contextClientId);
   if (foreignId) {
     console.log('[MyLoans] param clientId', paramId, 'no es el de la sesión', contextClientId, '→ usando el de sesión');

@@ -19,12 +19,16 @@ export type InicioState = 'loading' | 'load-failed';
 export function useInicio() {
   const history = useHistory();
   const {
-    companyId, clientId, clientCapabilitiesKey, availableProducts, activeProduct, setActiveProduct, logout, refreshCapabilities,
+    companyId, clientId, clientCapabilitiesKey, cellphoneClientId, availableProducts, activeProduct, setActiveProduct, logout, refreshCapabilities,
   } = useUser();
   const [timedOut, setTimedOut] = useState(false);
   const [retrying, setRetrying] = useState(false);
 
-  const capabilitiesLoaded = !clientId || clientCapabilitiesKey === `${companyId}:${clientId}`;
+  // The client's phone decides the platform admin (UserContext): wait for it too,
+  // or the admin would land on another dashboard first. A failed read gives up
+  // after the timeout and lands without the admin product.
+  const phoneLoaded = !clientId || cellphoneClientId === clientId || timedOut;
+  const capabilitiesLoaded = phoneLoaded && (!clientId || clientCapabilitiesKey === `${companyId}:${clientId}`);
   const landing = smartLoansLanding(availableProducts, activeProduct, clientId);
 
   // A POS/Rewards account (roleCode 'pos') starts with activeProduct 'pos'. Switch
@@ -33,13 +37,14 @@ export function useInicio() {
   const product = smartLoansProductFor(availableProducts, activeProduct);
 
   useEffect(() => {
+    if (!phoneLoaded) return;
     if (product && product !== activeProduct) {
       console.log('[Inicio] active product', activeProduct, '→', product);
       setActiveProduct(product);
     }
     if (landing) history.replace(landing);
     else if (capabilitiesLoaded) history.replace(ENROLLMENT_ROUTE);
-  }, [landing, capabilitiesLoaded, product, activeProduct]);
+  }, [landing, capabilitiesLoaded, phoneLoaded, product, activeProduct]);
 
   useEffect(() => {
     if (capabilitiesLoaded) return;

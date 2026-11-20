@@ -2,6 +2,7 @@
  * useLenderDashboard — ViewModel del dashboard del prestamista (MVVM).
  * Todo el estado, efectos, fetchers y cálculos viven aquí; la View solo pinta.
  */
+import { pinnedClientId } from '../../../utils/ownClientId';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useHistory, useLocation } from 'react-router-dom';
 import { useIonViewWillEnter } from '@ionic/react';
@@ -9,7 +10,7 @@ import { useUser } from '../../../contexts/UserContext';
 import { getAllLoans, Loan } from '../../../api/loanApi';
 import { fetchActiveLoanOffers, countPendingProposalsForLender } from '../../../api/loanMarketplaceApi';
 import { getAllClients, Client } from '../../../api/clientsApi';
-import { ledgerStatement, LedgerEntry, listBankAccounts, BankAccount } from '../../../api/bankingApi';
+import { ledgerStatement, LedgerEntry, listBankAccounts, BankAccount, primaryBankAccount as findPrimaryBankAccount } from '../../../api/bankingApi';
 import { p2pLendingRoute } from '../../../utils/routes';
 import { getAllClientFaceRecognitions, upsertClientFaceRecognition, ClientFaceRecognition } from '../../../api/clientFaceRecognitionApi';
 import { listContractsForClient } from '../../../api/digitalContractsApi';
@@ -32,9 +33,10 @@ export function useLenderDashboard() {
     }, 350);
     return () => clearTimeout(t);
   }, [location.search]);
-  const { companyId } = useUser();
+  const { companyId, clientId: sessionClientId, roleCode: sessionRoleCode } = useUser();
 
-  const lenderClientId = Number(clientIdParam);
+  // Self-service sessions are pinned to their own clientId (utils/ownClientId).
+  const lenderClientId = pinnedClientId(clientIdParam, sessionClientId, sessionRoleCode);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -74,6 +76,7 @@ export function useLenderDashboard() {
       clientId: lenderClientId,
       continueToPayments: true,
       returnTo: `/lender-dashboard/${lenderClientId}`,
+      registerAs: 'lender',
     });
   };
 
@@ -91,8 +94,8 @@ export function useLenderDashboard() {
       { label: 'Prueba de vida (selfie)', done: !!f?.clientSelfieBlobUrl },
       { label: 'Comprobante de presencia', done: !!f?.presenceVideoBlobUrl },
       { label: 'Verificación biométrica', done: biometricDone, review: biometricReview },
+      // A lender signs only the contract with GMO Prestamos (no pagaré).
       { label: 'Contrato firmado', done: !!f?.contractAccepted },
-      { label: 'Pagaré aceptado', done: !!f?.pagareAccepted },
     ];
   }, [faceRecord]);
   const verificationDone = verificationSteps.filter(s => s.done).length;
@@ -284,18 +287,19 @@ export function useLenderDashboard() {
 
   // ── Primeros pasos: what a new lender must finish before lending ──────────
   // 1) identity: same "verified" rule as VerificationCard (biometric + contract + pagaré);
-  // 2) a verified PRIMARY CLABE — isVerified alone is not enough, an ARCHIVED
-  //    account can arrive with isVerified=1 (D18), so isDefault is required too;
+  // 2) a verified PRIMARY CLABE (shared rule: bankingApi.primaryBankAccount);
   // 3) capital published in the marketplace (or already lent: a funded offer
   //    stops counting as published, the loan shows it was done).
-  const identityVerified = !!(faceRecord?.isVerified && faceRecord?.contractAccepted && faceRecord?.pagareAccepted);
-  const primaryBankAccount = bankAccounts.find(a => a.isVerified && a.isDefault && a.accountStatus !== 'ARCHIVED') ?? null;
+  const identityVerified = !!(faceRecord?.isVerified && faceRecord?.contractAccepted);
+  const primaryBankAccount = findPrimaryBankAccount(bankAccounts);
   const setupSteps = [
     {
       id: 'identity',
       label: 'Verifica tu identidad',
       detail: identityVerified ? 'Identidad verificada' : `${verificationDone} de ${verificationSteps.length} pasos completados`,
       done: identityVerified,
+      // Sub-progress of the KYC (INE, selfie, presencia, biometría, contrato, pagaré).
+      progress: identityVerified ? 1 : verificationDone / verificationSteps.length,
       cta: verificationDone > 0 ? 'Continuar' : 'Verificar',
       action: handleStartVerification,
     },
@@ -321,7 +325,12 @@ export function useLenderDashboard() {
     },
   ];
   const setupDone = setupSteps.filter(s => s.done).length;
-  const setupPct = Math.round((setupDone / setupSteps.length) * 100);
+  // Partial credit for a step in progress (4 of 6 KYC pieces = 2/3 of a step),
+  // so the bar moves as soon as the lender starts instead of sitting at 0%.
+  const setupProgress = setupSteps.reduce(
+    (sum, s) => sum + (s.done ? 1 : ('progress' in s ? s.progress ?? 0 : 0)), 0,
+  ) / setupSteps.length;
+  const setupPct = Math.round(setupProgress * 100);
   const setupLoaded = baseLoaded && bankAccountsLoaded && offersLoaded;
   // The next step to do: the first one not done (steps are meant in order).
   const setupNextId = setupSteps.find(s => !s.done)?.id ?? null;
@@ -404,7 +413,7 @@ export function useLenderDashboard() {
     faceRecord, wizardStarting, handleStartVerification,
     verificationSteps, verificationDone, verificationInReview,
     // primeros pasos (new-lender setup)
-    setupSteps, setupDone, setupPct, setupLoaded, setupNextId,
+    setupSteps, setupDone, setupPct, setupProgress, setupLoaded, setupNextId,
     // stripe
     stripeAccount, stripeLoading, stripeError, showStripeOnboarding,
     setShowStripeOnboarding,

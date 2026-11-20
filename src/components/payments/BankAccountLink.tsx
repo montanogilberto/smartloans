@@ -9,7 +9,7 @@ import {
 } from 'ionicons/icons';
 import {
   BankAccount, linkBankAccount, verifyBankAccount, listBankAccounts,
-  setPrimaryBankAccount,
+  setPrimaryBankAccount, bankAccountBucket as bucketOf,
 } from '../../api/bankingApi';
 import { useToast } from '../../hooks/useToast';
 import './BankAccountLink.css';
@@ -33,18 +33,11 @@ interface Props {
 //   1. Tu cuenta principal  — la única que recibe dinero
 //   2. En verificación      — la nueva, esperando micro-depósito o promoción
 //   3. Historial            — archivadas, sólo lectura
-type Bucket = 'primary' | 'pending' | 'archived';
-
-// `accountStatus` es la verdad, pero sp_bankAccounts_all no siempre lo
-// proyecta. Sin él, `isDefault` es el único indicador fiable — y ojo: una
-// cuenta ARCHIVED llega con isVerified=1, así que "verificada" jamás alcanza
-// para tratarla como destino de dinero.
-const bucketOf = (a: BankAccount): Bucket => {
-  if (a.accountStatus === 'ARCHIVED') return 'archived';
-  if (a.accountStatus === 'PRIMARY') return 'primary';
-  if (a.accountStatus === 'PENDING_VERIFICATION') return 'pending';
-  return a.isVerified && a.isDefault ? 'primary' : 'pending';
-};
+//
+// La regla de qué zona le toca a cada cuenta vive en bankingApi
+// (bankAccountBucket) para que el tile, este modal y las precondiciones del
+// préstamo nunca discrepen. Una CLABE recién vinculada nace PRIMARY pero sin
+// verificar: va a "En verificación" hasta que se confirmen los centavos.
 
 const BankAccountLink: React.FC<Props> = ({ clientId, companyId, holderName, onChanged }) => {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
@@ -134,8 +127,8 @@ const BankAccountLink: React.FC<Props> = ({ clientId, companyId, holderName, onC
       // aplica (préstamos activos, cuenta ya archivada). Un 200 no prueba nada:
       // hay que releer y confirmar que quedó realmente como principal.
       const fresh = await load();
-      const applied = fresh.find(a => a.bankAccountId === account.bankAccountId)?.isDefault;
-      if (!applied) {
+      const promoted = fresh.find(a => a.bankAccountId === account.bankAccountId);
+      if (!promoted || bucketOf(promoted) !== 'primary') {
         console.log('[BankAccountLink] activate ⚠️ no-op — el servidor no la marcó principal', account.bankAccountId);
         throw new Error('El servidor no aplicó el cambio. Si tienes préstamos activos, tu CLABE queda fija hasta liquidarlos.');
       }

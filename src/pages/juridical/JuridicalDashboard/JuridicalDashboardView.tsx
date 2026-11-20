@@ -8,6 +8,7 @@ import {
 } from '@ionic/react';
 import {
   briefcaseOutline, documentTextOutline, folderOpenOutline, close, refreshOutline, lockClosedOutline,
+  createOutline, checkmarkCircleOutline,
 } from 'ionicons/icons';
 import Header from '../../../components/layout/Header';
 import AlertPopover from '../../../components/popovers/AlertPopover';
@@ -42,6 +43,33 @@ const JuridicalDashboardView: React.FC = () => {
                     {vm.pendingCount} {vm.pendingCount === 1 ? 'asignación pendiente' : 'asignaciones pendientes'}
                   </p>
                 </div>
+              </IonCardContent>
+            </IonCard>
+
+            <IonCard>
+              <IonCardContent>
+                {vm.contract === null ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <IonSpinner name="crescent" /> <span>Cargando tu contrato…</span>
+                  </div>
+                ) : vm.contract.signed ? (
+                  <IonItem lines="none" button={!!vm.contract.pdfUrl} detail={!!vm.contract.pdfUrl}
+                    onClick={() => vm.contract?.pdfUrl && window.open(vm.contract.pdfUrl, '_blank', 'noopener,noreferrer')}>
+                    <IonIcon icon={checkmarkCircleOutline} slot="start" color="success" />
+                    <IonLabel>
+                      <h3>Contrato de servicios firmado</h3>
+                      {vm.contract.pdfUrl && <p>Toca para verlo</p>}
+                    </IonLabel>
+                  </IonItem>
+                ) : (
+                  <>
+                    <h3 style={{ marginTop: 0 }}>Firma tu contrato de servicios</h3>
+                    <p>Verifica tu identidad y firma tu contrato con GMO Prestamos para recibir asignaciones.</p>
+                    <IonButton expand="block" onClick={vm.startSigning} disabled={vm.signingStarting}>
+                      {vm.signingStarting ? <IonSpinner name="crescent" /> : (<><IonIcon icon={createOutline} slot="start" />Firmar contrato</>)}
+                    </IonButton>
+                  </>
+                )}
               </IonCardContent>
             </IonCard>
 

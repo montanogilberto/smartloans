@@ -3,13 +3,18 @@ import { IonBadge, IonCard, IonCardContent, IonIcon, IonSpinner } from '@ionic/r
 import { documentTextOutline, openOutline } from 'ionicons/icons';
 import { mxDate, fmtMXN } from '../../../../utils/format';
 import { ProfileVM } from '../ProfileLogic';
+import { useUser } from '../../../../contexts/UserContext';
+import { actsAsLender } from '../../../../utils/productContext';
 
 /**
  * Contratos — Pagaré + Contrato P2P (firmados una vez, en clientFaceRecognitions)
  * y el detalle por préstamo (digitalContracts, uno por cada préstamo fondeado).
  */
 const ContractsCard: React.FC<{ vm: ProfileVM }> = ({ vm }) => {
+  const { roleCode, activeProduct } = useUser();
   const nothingSigned = !vm.faceRecord?.pagareAccepted && !vm.faceRecord?.contractAccepted && vm.contracts.length === 0;
+  // A lender signs no pagaré (only the contract with GMO Prestamos): don't list it as pending.
+  const showPagare = !!vm.faceRecord?.pagareAccepted || !actsAsLender(roleCode, activeProduct);
 
   return (
     <IonCard className="profile-card">
@@ -30,6 +35,7 @@ const ContractsCard: React.FC<{ vm: ProfileVM }> = ({ vm }) => {
           <p className="profile-empty-text">Aún no tienes documentos firmados.</p>
         ) : (
           <>
+            {showPagare && (
             <div className="profile-info-row">
               <span className="profile-row-icon profile-icon-teal-soft"><IonIcon icon={documentTextOutline} /></span>
               <div className="profile-row-text">
@@ -46,11 +52,12 @@ const ContractsCard: React.FC<{ vm: ProfileVM }> = ({ vm }) => {
                 </a>
               )}
             </div>
+            )}
 
             <div className="profile-info-row">
               <span className="profile-row-icon profile-icon-teal-soft"><IonIcon icon={documentTextOutline} /></span>
               <div className="profile-row-text">
-                <span>Contrato de Crédito P2P</span>
+                <span>{showPagare ? 'Contrato de Crédito P2P' : 'Contrato de Crédito con GMO Prestamos'}</span>
                 <strong>
                   {vm.faceRecord?.contractAccepted
                     ? `Firmado el ${mxDate(vm.faceRecord.contractAcceptedAt)}`
@@ -63,6 +70,32 @@ const ContractsCard: React.FC<{ vm: ProfileVM }> = ({ vm }) => {
                 </a>
               )}
             </div>
+
+            {vm.faceRecord?.pagarePdfBlobUrl && (
+              <div className="profile-info-row">
+                <span className="profile-row-icon profile-icon-teal-soft"><IonIcon icon={documentTextOutline} /></span>
+                <div className="profile-row-text">
+                  <span>Pagaré</span>
+                  <strong>{vm.faceRecord.contractAcceptedAt ? `Firmado el ${mxDate(vm.faceRecord.contractAcceptedAt)}` : 'Firmado'}</strong>
+                </div>
+                <a href={vm.faceRecord.pagarePdfBlobUrl} target="_blank" rel="noreferrer" className="profile-pdf-link" aria-label="Abrir Pagaré">
+                  <IonIcon icon={openOutline} />
+                </a>
+              </div>
+            )}
+
+            {vm.faceRecord?.resguardoPdfBlobUrl && (
+              <div className="profile-info-row">
+                <span className="profile-row-icon profile-icon-teal-soft"><IonIcon icon={documentTextOutline} /></span>
+                <div className="profile-row-text">
+                  <span>Constancia de resguardo del pagaré</span>
+                  <strong>{vm.faceRecord.contractAcceptedAt ? `Firmado el ${mxDate(vm.faceRecord.contractAcceptedAt)}` : 'Firmado'}</strong>
+                </div>
+                <a href={vm.faceRecord.resguardoPdfBlobUrl} target="_blank" rel="noreferrer" className="profile-pdf-link" aria-label="Abrir Constancia de resguardo del pagaré">
+                  <IonIcon icon={openOutline} />
+                </a>
+              </div>
+            )}
 
             {vm.contracts.length > 0 && (
               <div className="profile-loan-contracts">
