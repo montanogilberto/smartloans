@@ -294,6 +294,90 @@ export function detectCardGeometry(imageData: ImageData): CardGeometry {
   return { detected: true, coverage, tiltDegrees, keystoneRatio, isFrontal };
 }
 
+/** Card box as fractions (0–1) of the image, from the top-left. */
+export interface CardBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const ID1_ASPECT = 85.6 / 54;
+
+// Finds the ID card in a whole photo from the phone's own camera app, so it can
+// be cropped like the live guide used to. Same bright-region idea as
+// detectCardGeometry: rows where the card shows up as a long bright run. Rows
+// are grouped into vertical blocks (a lit wall or a blue surface can form a
+// block of its own), and the block whose box is closest to an ID-1 card wins.
+// Edges are the median per-row edges, so stray highlights can't widen the box.
+// Returns null when nothing card-shaped is found: the caller then keeps the
+// whole photo.
+export function detectCardBounds(imageData: ImageData): CardBounds | null {
+  const { data, width, height } = imageData;
+  if (width < 8 || height < 8) return null;
+  const gray = toGrayscale(data, width, height);
+  const threshold = otsuThreshold(gray);
+  const minRun = width * 0.25;
+  const maxGap = Math.max(1, Math.round(height * 0.02));
+
+  type Row = { y: number; left: number; right: number };
+  const blocks: Row[][] = [];
+  let current: Row[] = [];
+  for (let y = 0; y < height; y++) {
+    let left = -1;
+    let right = -1;
+    let count = 0;
+    for (let x = 0; x < width; x++) {
+      if (gray[y * width + x] > threshold) {
+        if (left === -1) left = x;
+        right = x;
+        count++;
+      }
+    }
+    if (count < minRun) continue;
+    if (current.length && y - current[current.length - 1].y > maxGap) {
+      blocks.push(current);
+      current = [];
+    }
+    current.push({ y, left, right });
+  }
+  if (current.length) blocks.push(current);
+
+  const median = (values: number[]) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)];
+  };
+
+  let best: { bounds: CardBounds; score: number } | null = null;
+  for (const block of blocks) {
+    const top = block[0].y;
+    const bottom = block[block.length - 1].y + 1;
+    const left = median(block.map((r) => r.left));
+    const right = median(block.map((r) => r.right)) + 1;
+    const w = right - left;
+    const h = bottom - top;
+    if (w <= 0 || h <= 0) continue;
+    const area = (w * h) / (width * height);
+    const aspect = w / h;
+    // A card shot face-on is ~1.59; allow perspective and loose framing.
+    if (area < 0.08 || aspect < 1.25 || aspect > 2.0) continue;
+    const score = area / (1 + Math.abs(aspect - ID1_ASPECT));
+    if (!best || score > best.score) {
+      best = { bounds: { x: left / width, y: top / height, width: w / width, height: h / height }, score };
+    }
+  }
+  if (!best) return null;
+
+  // A little margin so a slightly soft edge or a missed corner isn't cut off.
+  const pad = 0.03;
+  const b = best.bounds;
+  const x0 = Math.max(0, b.x - pad);
+  const y0 = Math.max(0, b.y - pad);
+  const x1 = Math.min(1, b.x + b.width + pad);
+  const y1 = Math.min(1, b.y + b.height + pad);
+  return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+}
+
 // Scoped to the guide interior — a dark background around a well-lit
 // document (or vice versa) shouldn't drag this down.
 function computeBrightnessScore(gray: Uint8ClampedArray, rect: OverlayRect, width: number, height: number): number {

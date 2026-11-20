@@ -10,6 +10,7 @@ import {
   OverlayRect,
   PositionHint,
 } from '../../utils/documentCaptureAnalysis';
+import NativeDocumentCapture from './NativeDocumentCapture';
 import './GuidedDocumentCapture.css';
 
 type CaptureState = 'initializing' | 'searching' | 'aligning' | 'stable' | 'captured' | 'error';
@@ -218,7 +219,7 @@ function computeCoverRect(
   return { sx, sy, sw, sh };
 }
 
-const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
+const LiveDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
   title,
   instructions,
   onCapture,
@@ -780,5 +781,11 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
     </div>
   );
 };
+
+// On a phone the ID is shot with the device's own camera app (real autofocus,
+// tap-to-focus): the WebView preview above never focused on a card a few cm
+// away on several Android devices. The live preview stays for the web build.
+const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = (props) =>
+  Capacitor.isNativePlatform() ? <NativeDocumentCapture {...props} /> : <LiveDocumentCapture {...props} />;
 
 export default GuidedDocumentCapture;

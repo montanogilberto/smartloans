@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { IonIcon, IonSpinner } from '@ionic/react';
 import { warningOutline, checkmarkCircle } from 'ionicons/icons';
 import { Capacitor } from '@capacitor/core';
-import { Camera } from '@capacitor/camera';
+import { Camera, CameraDirection, CameraResultType, CameraSource } from '@capacitor/camera';
 import {
   loadFaceApiModels,
   detectFaceFromVideo,
@@ -162,8 +162,10 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
     }
   }, []);
 
-  // Grabs the current video frame as a JPEG data URL. Shared by the per-pose
-  // captures and the final selfie so they cannot drift in encoding/quality.
+  // Grabs the current video frame as a JPEG data URL. Used for the per-pose
+  // captures (the head is mid-challenge, so a native shutter would steal the
+  // camera and break the session). The identity selfie uses the camera plugin
+  // instead — see takeIdentityPhoto.
   const grabFrame = useCallback((): string => {
     const video = videoRef.current;
     const canvas = captureCanvasRef.current;
@@ -175,6 +177,33 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     return canvas.toDataURL('image/jpeg', 0.92);
   }, []);
+
+  // Identity selfie: native camera shutter (CameraSource.Camera), never the
+  // photo library. The preview stream must be released first — Android/iOS
+  // only give one client the camera at a time. If the person cancels the
+  // shutter, we keep the last live frame so the session still completes.
+  const takeIdentityPhoto = useCallback(async (fallback: string): Promise<string> => {
+    if (!Capacitor.isNativePlatform()) return fallback;
+    stopStream();
+    try {
+      console.log('[FaceLivenessCapture] takeIdentityPhoto: opening camera (not library)');
+      const photo = await Camera.getPhoto({
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Camera,
+        direction: CameraDirection.Front,
+        quality: 90,
+        saveToGallery: false,
+        width: 1280,
+        height: 720,
+      });
+      const dataUrl = photo.dataUrl ?? '';
+      console.log('[FaceLivenessCapture] takeIdentityPhoto: captured, length =', dataUrl.length);
+      return dataUrl || fallback;
+    } catch (err) {
+      console.log('[FaceLivenessCapture] takeIdentityPhoto: cancelled or failed —', String(err));
+      return fallback;
+    }
+  }, [stopStream]);
 
   // Captured as each pose is actually achieved — see PosePhotos.
   const posePhotosRef = useRef<PosePhotos>({});
@@ -291,34 +320,42 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
 
   const finish = useCallback(
     (descriptor: Float32Array) => {
-      console.log('[FaceLivenessCapture] finish: all checks passed, capturing selfie frame');
-      const selfieBase64 = grabFrame();
-      if (!selfieBase64) {
+      console.log('[FaceLivenessCapture] finish: all checks passed, capturing identity photo');
+      const videoFallback = grabFrame();
+      if (!videoFallback) {
         console.log('[FaceLivenessCapture] finish: ABORT — could not grab final frame');
         return;
       }
-      console.log('[FaceLivenessCapture] finish: selfie captured, base64 length =', selfieBase64.length);
 
-      // Fall back to the final frame for 'front' if the neutral capture never
-      // landed, so the pose set is never missing the one Stripe/ID matching
-      // and the validation agent care about most.
-      if (!posePhotosRef.current.front) posePhotosRef.current.front = selfieBase64;
+      void (async () => {
+        const selfieBase64 = await takeIdentityPhoto(videoFallback);
+        if (!selfieBase64) {
+          console.log('[FaceLivenessCapture] finish: ABORT — no identity photo');
+          return;
+        }
+        console.log('[FaceLivenessCapture] finish: selfie captured, base64 length =', selfieBase64.length);
 
-      const posePhotos = { ...posePhotosRef.current };
-      console.log('[FaceLivenessCapture] finish: pose photos =', JSON.stringify(
-        (Object.keys(posePhotos) as FacePose[]).reduce<Record<string, number>>(
-          (acc, k) => { acc[k] = posePhotos[k]?.length ?? 0; return acc; }, {}
-        )
-      ));
+        // Fall back to the identity photo for 'front' if the neutral capture never
+        // landed, so the pose set is never missing the one Stripe/ID matching
+        // and the validation agent care about most.
+        if (!posePhotosRef.current.front) posePhotosRef.current.front = selfieBase64;
 
-      stopStream();
-      setState('captured');
-      setTimeout(() => {
-        console.log('[FaceLivenessCapture] finish: calling onComplete()');
-        onComplete({ selfieBase64, descriptor, posePhotos });
-      }, 500);
+        const posePhotos = { ...posePhotosRef.current };
+        console.log('[FaceLivenessCapture] finish: pose photos =', JSON.stringify(
+          (Object.keys(posePhotos) as FacePose[]).reduce<Record<string, number>>(
+            (acc, k) => { acc[k] = posePhotos[k]?.length ?? 0; return acc; }, {}
+          )
+        ));
+
+        stopStream();
+        setState('captured');
+        setTimeout(() => {
+          console.log('[FaceLivenessCapture] finish: calling onComplete()');
+          onComplete({ selfieBase64, descriptor, posePhotos });
+        }, 500);
+      })();
     },
-    [onComplete, stopStream, grabFrame]
+    [onComplete, stopStream, grabFrame, takeIdentityPhoto]
   );
 
   const tick = useCallback(
