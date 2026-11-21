@@ -20,13 +20,16 @@ const PortfolioHero: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
       </div>
     )}
 
-    {/* Hero: valor del portafolio + donut publicado/prestado/recuperado */}
+    {/* Hero: capital prestado (dinero real en préstamos activos) + donut de
+        distribución. Antes era "Valor de mi portafolio" = publicado + prestado
+        + recuperado: sumaba capital sólo declarado con dinero real y contaba
+        dos veces el capital recuperado que se vuelve a publicar. */}
     <div className="ldx-hero">
       <div className="ldx-hero-left">
-        <p>Valor de mi portafolio <IonIcon icon={informationCircleOutline} /></p>
-        <h1>${vm.portfolioTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</h1>
+        <p>Capital prestado (activo) <IonIcon icon={informationCircleOutline} /></p>
+        <h1>${vm.totalActive.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</h1>
         <span className="ldx-hero-month">
-          <IonIcon icon={arrowUpOutline} /> +${vm.earningsMonth.toLocaleString('es-MX', { minimumFractionDigits: 2 })} este mes
+          <IonIcon icon={arrowUpOutline} /> +${vm.earningsMonth.toLocaleString('es-MX', { minimumFractionDigits: 2 })} de intereses este mes
         </span>
         <IonButton fill="outline" className="ldx-hero-btn"
           onClick={() => { console.log('[LenderDashboard] hero →', p2pLendingRoute(vm.lenderClientId)); vm.history.push(p2pLendingRoute(vm.lenderClientId)); }}>
@@ -38,6 +41,7 @@ const PortfolioHero: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
           ? <div className="ldx-donut ldx-donut-loading"><IonSpinner name="crescent" /></div>
           : <div className="ldx-donut" style={vm.donutStyle}><div className="ldx-donut-hole" /></div>}
         <div className="ldx-donut-legend">
+          <p className="ldx-donut-title">Distribución</p>
           {[
             { label: 'Publicado',  dot: '#7da2f7', v: vm.publishedCapital },
             { label: 'Prestado',   dot: '#c084fc', v: vm.totalActive },

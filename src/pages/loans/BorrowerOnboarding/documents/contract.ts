@@ -12,7 +12,7 @@ PARTES:
 
 PRIMERA — OBJETO: El Acreditante otorga al Acreditado un crédito personal de hasta $_________________ M.N. bajo las condiciones establecidas en el Pagaré firmado en este mismo acto.
 
-SEGUNDA — TASA Y PLAZO: La tasa de interés, el plazo y la forma de pago quedarán determinados en el Pagaré correspondiente y en la oferta aceptada dentro de la plataforma GMO Prestamos.
+SEGUNDA — TASA Y PLAZO: La tasa de interés, el plazo y la forma de pago quedarán determinados en el Pagaré correspondiente y en la oferta aceptada dentro de la plataforma GMO Prestamos. Cuando la oferta aceptada sea un plan sin intereses, el crédito no genera intereses durante el plazo pactado y cada amortización mínima es igual al monto del crédito dividido entre el número de meses del plazo. El capital que quede sin pagar al vencer la última amortización genera, desde esa fecha y hasta su pago, el interés anual pactado en la oferta aceptada, calculado por día natural sobre el capital insoluto y cobrado por periodos mensuales. Ese interés no se capitaliza.
 
 TERCERA — PAGOS DIRECTOS ENTRE LAS PARTES (PLATAFORMA NO CUSTODIA): El Acreditante deposita el crédito y el Acreditado paga cada amortización mediante transferencia SPEI directa a la cuenta CLABE que la otra parte tenga registrada en la plataforma GMO Prestamos. GMO Prestamos es una plataforma tecnológica que no es parte de este crédito y no recibe, retiene ni transfiere el dinero del crédito; únicamente registra la evidencia de cada operación (clave de rastreo o Comprobante Electrónico de Pago de Banxico) y la confirmación de quien recibe el pago.
 
@@ -27,7 +27,7 @@ c) Notificar cualquier cambio de domicilio o situación financiera relevante den
 d) Mantener vigentes los datos biométricos y la cuenta CLABE registrados en la plataforma.
 
 SÉPTIMA — INCUMPLIMIENTO: En caso de mora el Acreditante podrá:
-i) Cobrar intereses moratorios al doble de la tasa ordinaria pactada.
+i) Cobrar intereses moratorios al doble de la tasa ordinaria pactada. En un plan sin intereses, la tasa ordinaria es la que aplica al capital insoluto después del plazo.
 ii) Hacer exigible la totalidad del crédito de manera anticipada.
 iii) Ejercer acción ejecutiva mercantil con base en el Pagaré suscrito.
 

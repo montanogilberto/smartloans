@@ -36,6 +36,8 @@ export interface DocumentFillData {
 
 const LENDER_TBD = `el Prestamista cuya oferta sea aceptada en la plataforma ${PLATFORM_NAME}`;
 const PER_OFFER = `conforme a la oferta aceptada en la plataforma ${PLATFORM_NAME}`;
+// RFC-019: plan sin intereses — la tasa sólo aplica al capital vencido tras el plazo.
+const PAGARE_INTEREST_FREE = 'Si la oferta es un plan sin intereses, el interés aplica sólo al capital que quede sin pagar al vencer el plazo, a partir de esa fecha.';
 
 /** "19 de noviembre de 2026". */
 export const longDate = (d: Date): string =>
@@ -90,7 +92,7 @@ export function fillPagare(data: DocumentFillData): string {
   t = fillOnce(t, 'la cantidad de $_________________ (________________________ pesos 00/100 M.N.), en la fecha de vencimiento _____________,',
     `la cantidad, en moneda nacional, ${PER_OFFER}, en la fecha de vencimiento ahí pactada,`);
   t = fillOnce(t, 'un interés anual del ____% sobre saldos insolutos, pagadero de manera _____________.',
-    `el interés anual sobre saldos insolutos y con la periodicidad pactados ${PER_OFFER}.`);
+    `el interés anual sobre saldos insolutos y con la periodicidad pactados ${PER_OFFER}. ${PAGARE_INTEREST_FREE}`);
   t = fillOnce(t, 'será pagado en ___________________________.',
     `será pagado mediante transferencia SPEI directa a la cuenta CLABE que el Beneficiario tenga registrada en ${PLATFORM_NAME}.`);
   return t;

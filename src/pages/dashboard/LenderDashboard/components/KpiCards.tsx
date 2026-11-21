@@ -8,9 +8,9 @@ const KpiCards: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
   <IonGrid className="ld-kpi-grid">
     <IonRow>
       {[
-        { icon: megaphoneOutline,  label: 'Capital publicado', value: `$${vm.publishedCapital.toLocaleString()}`, sub: `${vm.pct(vm.publishedCapital)}% del portafolio`, color: '#2563eb', bg: '#eff6ff' },
-        { icon: cardOutline,       label: 'Capital prestado',  value: `$${vm.totalActive.toLocaleString()}`,      sub: `${vm.pct(vm.totalActive)}% del portafolio`,      color: '#9333ea', bg: '#faf5ff' },
-        { icon: trendingUpOutline, label: 'Recuperado',        value: `$${vm.totalRepaid.toLocaleString()}`,      sub: `${vm.pct(vm.totalRepaid)}% del portafolio`,      color: '#16a34a', bg: '#f0fdf4' },
+        { icon: megaphoneOutline,  label: 'Capital publicado', value: `$${vm.publishedCapital.toLocaleString()}`, sub: 'Declarado, no es dinero en GMO', color: '#2563eb', bg: '#eff6ff' },
+        { icon: cardOutline,       label: 'Capital prestado',  value: `$${vm.totalActive.toLocaleString()}`,      sub: `${vm.pct(vm.totalActive)}% de la distribución`,      color: '#9333ea', bg: '#faf5ff' },
+        { icon: trendingUpOutline, label: 'Recuperado',        value: `$${vm.totalRepaid.toLocaleString()}`,      sub: `${vm.pct(vm.totalRepaid)}% de la distribución`,      color: '#16a34a', bg: '#f0fdf4' },
         { icon: barChartOutline,   label: 'Tasa promedio (APR)', value: `${vm.avgInterest.toFixed(1)}%`,          sub: 'Rendimiento actual',                              color: '#ea580c', bg: '#fff7ed' },
       ].map(k => (
         <IonCol size="6" sizeMd="3" key={k.label}>

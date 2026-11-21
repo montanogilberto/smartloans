@@ -41,6 +41,6 @@ export const ENROLL_OPTIONS: EnrollOption[] = [
 ];
 
 export const ENROLL_TERMS = [
-  'Autorizo el tratamiento de mis datos personales, incluidos datos biométricos, conforme a la LFPDPPP y el Aviso de Privacidad de POS GMO.',
+  'Autorizo el tratamiento de mis datos personales, incluidos datos biométricos, conforme a la LFPDPPP y el Aviso de Privacidad de GMO Prestamos.',
   'Entiendo que cada préstamo requiere firmar pagaré y contrato dentro de la plataforma.',
 ];

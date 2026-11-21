@@ -45,7 +45,7 @@ const KNOWN_TYPES = Object.keys(TYPE_ICON);
 
 const NotificationsInboxPage: React.FC = () => {
   const history = useHistory();
-  const { userId, roleCode, clientId, availableProducts, activeProduct } = useUser();
+  const { userId, roleCode, clientId, companyId, availableProducts, activeProduct } = useUser();
   const [items, setItems] = useState<InboxNotification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -57,18 +57,18 @@ const NotificationsInboxPage: React.FC = () => {
     if (!userId) { setLoading(false); return; }
     setLoading(true);
     try {
-      const { notifications } = await fetchMyNotifications(userId);
+      const { notifications } = await fetchMyNotifications(userId, { companyId, clientId });
       setItems(notifications);
       if (markAll && notifications.some(n => !n.isRead)) {
         // Reading the inbox counts as reading the notifications — clears the
         // badge; unread styling on THIS render still shows what was new.
-        markNotificationsRead(userId).catch(() => {});
+        markNotificationsRead(userId, undefined, { companyId, clientId }).catch(() => {});
       }
     } catch (e) {
       console.log('[Inbox] load ❌', String(e));
     }
     setLoading(false);
-  }, [userId]);
+  }, [userId, companyId, clientId]);
 
   useIonViewWillEnter(() => { load(true); }, [load]);
   useEffect(() => onDataChanged(() => { load(); }), [load]);

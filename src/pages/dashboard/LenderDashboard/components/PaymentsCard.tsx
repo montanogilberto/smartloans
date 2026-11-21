@@ -1,105 +1,124 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonIcon,
+  IonButton, IonButtons, IonCard, IonCardContent, IonContent, IonHeader, IonIcon,
+  IonModal, IonSpinner, IonTitle, IonToolbar,
 } from '@ionic/react';
-import {
-  addCircleOutline, cardOutline, checkmarkCircle, documentTextOutline,
-  ellipseOutline, refreshOutline,
-} from 'ionicons/icons';
-import NativeConnectOnboarding from '../../../../components/payments/NativeConnectOnboarding';
-import { mxDate } from '../../../../utils/format';
+import { cardOutline, checkmarkCircle, ellipseOutline, lockClosedOutline, refreshOutline } from 'ionicons/icons';
+import BankAccountLink from '../../../../components/payments/BankAccountLink';
+import { bankAccountBucket } from '../../../../api/bankingApi';
 import { LenderDashboardVM } from '../LenderDashboardLogic';
+import CollapsibleHeader, { useCollapsed } from './CollapsibleHeader';
 
 /**
- * Cuenta de pago — funds loan disbursements and receives repayments.
+ * Cuenta de pago = la CLABE de SmartLoans donde el prestamista recibe por SPEI
+ * directo los pagos de sus prestatarios (RFC-016: sin Stripe Connect, el dinero
+ * nunca pasa por GMO). Misma regla que el resto de la app: sólo una CLABE
+ * PRIMARY **y verificada** recibe dinero (bankingApi.primaryBankAccount).
  * id="ld-pagos" is the scroll target for the bottom-nav "Pagos" tab (?section=pagos).
  */
-const PaymentsCard: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
-  <IonCard className="ld-card" id="ld-pagos">
-    <IonCardHeader>
-      <div className="ldx-card-title-row">
-        <IonCardTitle>Cuenta de pago</IonCardTitle>
-        <IonButton fill="clear" size="small" onClick={vm.fetchStripeStatus}>
-          <IonIcon icon={refreshOutline} slot="icon-only" />
-        </IonButton>
-      </div>
-    </IonCardHeader>
-    <IonCardContent>
-      {vm.stripeError && (
-        <p className="ldx-payments-error">{vm.stripeError}</p>
+const PaymentsCard: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => {
+  const [showBankModal, setShowBankModal] = useState(false);
+  const primary = vm.primaryBankAccount;
+  const pending = vm.bankAccounts.find(a => bankAccountBucket(a) === 'pending' && !a.isVerified) ?? null;
+  const linked = primary ?? pending;
+  const locked = !!pending?.verificationLocked;
+
+  const steps = [
+    { ok: vm.identityVerified, label: 'Identidad verificada',
+      sub: vm.identityVerified ? undefined : 'Completa la verificación de identidad' },
+    { ok: !!linked, label: 'CLABE vinculada',
+      sub: linked ? `${linked.bankName ?? 'Banco'} · ····${linked.clabeLast4}` : 'Pendiente' },
+    { ok: !!primary, label: 'CLABE verificada',
+      sub: primary ? 'Lista para recibir pagos por SPEI'
+        : locked ? 'Bloqueada por intentos — contacta a soporte'
+        : pending ? 'Pendiente de verificación'
+        : 'Pendiente', locked },
+  ];
+  const stepsDone = steps.filter(s => s.ok).length;
+  const complete = stepsDone === steps.length;
+  const [collapsed, toggle] = useCollapsed('payments', complete);
+
+  const summary = !vm.bankAccountsLoaded
+    ? 'Cargando…'
+    : complete
+      ? `✓ Lista · ····${primary?.clabeLast4 ?? ''}`
+      : `${stepsDone} de ${steps.length} pasos`;
+  const cta = primary ? 'Administrar mi CLABE' : pending ? 'Verificar mi CLABE' : 'Vincular mi CLABE';
+
+  return (
+    <IonCard className="ld-card" id="ld-pagos">
+      <CollapsibleHeader
+        title="Cuenta de pago" collapsed={collapsed} onToggle={toggle} summary={summary}
+        progress={vm.bankAccountsLoaded ? stepsDone / steps.length : undefined}
+        actions={(
+          <IonButton fill="clear" size="small" aria-label="Actualizar"
+            disabled={vm.bankAccountsRefreshing} onClick={vm.reloadBankAccounts}>
+            {vm.bankAccountsRefreshing
+              ? <IonSpinner name="crescent" />
+              : <IonIcon icon={refreshOutline} slot="icon-only" />}
+          </IonButton>
+        )}
+      />
+      {!collapsed && (
+        <IonCardContent>
+          {!vm.bankAccountsLoaded ? (
+            <div className="ldx-graph-loading"><IonSpinner name="crescent" /><span>Cargando tu cuenta…</span></div>
+          ) : (
+            <>
+              {!linked && (
+                <div className="ldx-payments-empty">
+                  <IonIcon icon={cardOutline} />
+                  <p className="ldx-payments-empty-title">Sin CLABE registrada.</p>
+                  <p className="ldx-payments-empty-sub">
+                    Vincula tu CLABE para que tus prestatarios te paguen por SPEI directo a tu banco.
+                  </p>
+                </div>
+              )}
+              <div className="ldx-checklist">
+                {steps.map((row, i, arr) => (
+                  <div key={row.label} className="ldx-check-row">
+                    <div className="ldx-check-rail">
+                      <IonIcon icon={row.ok ? checkmarkCircle : row.locked ? lockClosedOutline : ellipseOutline}
+                        className={row.ok ? 'ldx-check-ok' : 'ldx-check-off'} />
+                      {i < arr.length - 1 && <span className="ldx-check-line" />}
+                    </div>
+                    <div className="ldx-check-text">
+                      <strong>{row.label}</strong>
+                      {row.sub && <p>{row.sub}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <IonButton shape="round" expand="block" fill={primary ? 'outline' : 'solid'}
+                className="ldx-payments-complete-btn" onClick={() => setShowBankModal(true)}>
+                <IonIcon icon={cardOutline} slot="start" />
+                {cta}
+              </IonButton>
+            </>
+          )}
+        </IonCardContent>
       )}
 
-      {vm.showStripeOnboarding ? (
-        <NativeConnectOnboarding
-          clientId={vm.lenderClientId}
-          companyId={Number(vm.companyId)}
-          email={vm.lenderEmail}
-          // Identity already accepted by Stripe → skip step 1 on reload.
-          startAtPayout={!!vm.stripeAccount?.identitySubmitted && !vm.stripeAccount?.hasExternalAccount}
-          onProgress={(done) => { vm.fetchStripeStatus(); if (done) vm.setShowStripeOnboarding(false); }}
-          // Persist the lender's edited identity so their corrections
-          // survive and re-seed the form next time (not the raw OCR).
-          onIdentitySaved={vm.handleIdentitySaved}
-          // Seeded from the lender's captured INE + their real account
-          // email/phone (see kycPrefill).
-          prefill={vm.kycPrefill}
-        />
-      ) : !vm.stripeAccount ? (
-        <div className="ldx-payments-empty">
-          <IonIcon icon={cardOutline} />
-          <p className="ldx-payments-empty-title">Sin cuenta bancaria registrada.</p>
-          <p className="ldx-payments-empty-sub">
-            Registra tu cuenta o tarjeta para fondear préstamos y recibir los pagos de tus prestatarios.
-          </p>
-          <IonButton shape="round" expand="block" disabled={vm.stripeLoading} onClick={vm.handleStripeKyc}>
-            <IonIcon icon={addCircleOutline} slot="start" />
-            {vm.stripeLoading ? 'Procesando...' : 'Registrar cuenta'}
-          </IonButton>
-        </div>
-      ) : (
-        <div>
-          {/* Checklist con conector vertical — cada fila refleja el dato real
-              (antes "Cuenta verificada" estaba fijo en true, y mostraba el
-              connectedAccountId crudo de Stripe, ilegible para el prestamista). */}
-          <div className="ldx-checklist">
-            {[
-              { ok: !!vm.stripeAccount.identitySubmitted, label: 'Identidad verificada' },
-              { ok: !!vm.stripeAccount.hasExternalAccount, label: 'Cuenta bancaria vinculada',
-                sub: vm.stripeAccount.externalAccountLast4
-                  ? `${vm.stripeAccount.externalAccountBankName ?? 'Banco'} · ····${vm.stripeAccount.externalAccountLast4}`
-                  : 'Pendiente' },
-              { ok: !!vm.stripeAccount.tosAccepted, label: 'Términos y condiciones',
-                sub: vm.stripeAccount.tosAcceptedAt
-                  ? `Aceptados el ${mxDate(vm.stripeAccount.tosAcceptedAt)}`
-                  : 'Pendiente' },
-              { ok: !!vm.stripeAccount.payoutsEnabled, label: 'Retiros habilitados',
-                sub: vm.stripeAccount.payoutsEnabled
-                  ? 'Puedes recibir pagos de tus prestatarios'
-                  : 'Completa los pasos anteriores para habilitarlos' },
-            ].map((row, i, arr) => (
-              <div key={row.label} className="ldx-check-row">
-                <div className="ldx-check-rail">
-                  <IonIcon icon={row.ok ? checkmarkCircle : ellipseOutline}
-                    className={row.ok ? 'ldx-check-ok' : 'ldx-check-off'} />
-                  {i < arr.length - 1 && <span className="ldx-check-line" />}
-                </div>
-                <div className="ldx-check-text">
-                  <strong>{row.label}</strong>
-                  {row.sub && <p>{row.sub}</p>}
-                </div>
-              </div>
-            ))}
-          </div>
-          {!vm.stripeAccount.hasExternalAccount && (
-            <IonButton shape="round" expand="block" disabled={vm.stripeLoading} onClick={vm.handleStripeKyc} className="ldx-payments-complete-btn">
-              <IonIcon icon={documentTextOutline} slot="start" />
-              {vm.stripeLoading ? 'Procesando...' : 'Completar verificación'}
-            </IonButton>
-          )}
-        </div>
-      )}
-    </IonCardContent>
-  </IonCard>
-);
+      <IonModal isOpen={showBankModal} onDidDismiss={() => setShowBankModal(false)}>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Cuenta bancaria (SPEI)</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setShowBankModal(false)}>Cerrar</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          <BankAccountLink
+            clientId={vm.lenderClientId}
+            companyId={Number(vm.companyId)}
+            holderName={vm.lenderHolderName}
+            onChanged={vm.setBankAccounts}
+          />
+        </IonContent>
+      </IonModal>
+    </IonCard>
+  );
+};
 
 export default PaymentsCard;

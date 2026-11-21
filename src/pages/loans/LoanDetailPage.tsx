@@ -23,7 +23,10 @@ import {
 import { useUser } from '../../contexts/UserContext';
 import { getAllLoans, Loan } from '../../api/loanApi';
 import { getAllClients, Client } from '../../api/clientsApi';
-import { fetchInstallmentSchedule, payInstallmentSpei, Installment } from '../../api/installmentsApi';
+import {
+  fetchInstallmentSchedule, payInstallmentSpei, Installment,
+  fetchPostTermInterest, PostTermInterest, isPostTermInterest,
+} from '../../api/installmentsApi';
 import {
   ledgerBalance, getFundingByLoan, confirmFunding, rejectFunding, FundingTransaction,
   listFundingIntents, PaymentIntent, revealCounterpartyBankAccount, RevealedBankAccount,
@@ -45,6 +48,11 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import { LOAN_STATUS } from '../../components/ui/statusMaps';
 import './LoanDetailPage.css';
 
+// Fechas sin hora ('YYYY-MM-DD'): mxDate las lee como medianoche UTC y en
+// México mostraría el día anterior; se fijan a mediodía local.
+const toDay = (d?: string | null): string =>
+  d ? new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
 const LoanDetailPage: React.FC = () => {
   const { loanId: loanIdParam } = useParams<{ loanId: string }>();
   const loanId = Number(loanIdParam);
@@ -54,6 +62,8 @@ const LoanDetailPage: React.FC = () => {
 
   const [loan, setLoan] = useState<Loan | null>(null);
   const [cuotas, setCuotas] = useState<Installment[]>([]);
+  // RFC-019: plan sin intereses — tasa e interés posterior al plazo.
+  const [postTerm, setPostTerm] = useState<PostTermInterest | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [lenderId, setLenderId] = useState<number>(0);
   const [walletBalance, setWalletBalance] = useState(0);
@@ -100,6 +110,9 @@ const LoanDetailPage: React.FC = () => {
       setLoan(l);
       setCuotas(schedule);
       setClients(allClients);
+      setPostTerm(l?.paymentPlan === 'interest_free'
+        ? await fetchPostTermInterest(loanId, companyId)
+        : null);
 
       // Prestamista: por contrato (fuente formal) o por el tag en notes.
       let lid = 0;
@@ -380,7 +393,9 @@ const LoanDetailPage: React.FC = () => {
                 <StatusBadge status={loan.loanStatus} map={LOAN_STATUS} />
               </div>
               <div className="lde-terms">
-                <span><IonIcon icon={trendingUpOutline} /> {loan.interestRate}% anual</span>
+                <span><IonIcon icon={trendingUpOutline} /> {loan.paymentPlan === 'interest_free'
+                  ? `Sin intereses · ${loan.postTermRate ?? 0}% anual después del plazo`
+                  : `${loan.interestRate}% anual`}</span>
                 <span><IonIcon icon={timeOutline} /> {loan.termMonths} meses · {loan.paymentFrequency}</span>
                 <span><IonIcon icon={cashOutline} /> Desembolso: {toDate(loan.disbursementDate)}</span>
               </div>
@@ -462,6 +477,35 @@ const LoanDetailPage: React.FC = () => {
               </IonCard>
             )}
 
+            {/* RFC-019: plan sin intereses — aviso del interés posterior al plazo */}
+            {loan.paymentPlan === 'interest_free' && postTerm?.termEndDate && (() => {
+              const termEnded = new Date(`${postTerm.termEndDate}T23:59:59`) < new Date();
+              const rate = postTerm.postTermRate ?? loan.postTermRate ?? 0;
+              return (
+                <IonCard className="lde-card">
+                  <h2>Plan sin intereses</h2>
+                  {!termEnded && (
+                    <p>Sin intereses hasta el {toDay(postTerm.termEndDate)}. Si queda saldo después de esa fecha, genera {rate}% anual.</p>
+                  )}
+                  {termEnded && (postTerm.unpaidPrincipal ?? 0) > 0 && (
+                    <p>
+                      Tu plazo sin intereses terminó el {toDay(postTerm.termEndDate)}. El saldo de {fmt(postTerm.unpaidPrincipal ?? 0)} genera {rate}% anual.
+                      {' '}Interés acumulado sin cobrar: {fmt(postTerm.accruedUnbilledInterest ?? 0)}
+                      {postTerm.nextCutoffDate ? ` (se cobra el ${toDay(postTerm.nextCutoffDate)}).` : '.'}
+                    </p>
+                  )}
+                  {termEnded && (postTerm.unpaidPrincipal ?? 0) <= 0 && (
+                    <p>Capital pagado. {(postTerm.accruedUnbilledInterest ?? 0) > 0
+                      ? `Queda por cobrar el interés acumulado de ${fmt(postTerm.accruedUnbilledInterest ?? 0)}.`
+                      : 'Ya no se genera interés.'}</p>
+                  )}
+                  {(postTerm.billedUnpaidInterest ?? 0) > 0 && (
+                    <p>Interés después del plazo pendiente de pago: <strong>{fmt(postTerm.billedUnpaidInterest ?? 0)}</strong></p>
+                  )}
+                </IonCard>
+              );
+            })()}
+
             {/* Partes */}
             <IonCard className="lde-card">
               <h2>Partes del contrato</h2>
@@ -500,11 +544,15 @@ const LoanDetailPage: React.FC = () => {
                   <IonIcon icon={c.status === 'paid' ? checkmarkCircle : ellipseOutline}
                     className={c.status === 'paid' ? 'lde-ok' : 'lde-off'} />
                   <div className="lde-cuota-info">
-                    <strong>Cuota #{c.installmentNumber} · {fmt(c.amount)}</strong>
+                    <strong>{isPostTermInterest(c)
+                      ? `Interés después del plazo · ${fmt(c.amount)}`
+                      : `Cuota #${c.installmentNumber} · ${fmt(c.amount)}`}</strong>
                     <span>
                       {c.status === 'paid'
                         ? `Pagada ${toDate(c.paidAt)}`
-                        : `Vence ${toDate(c.dueDate)} · capital ${fmt(c.principal)} + interés ${fmt(c.interest)}`}
+                        : isPostTermInterest(c)
+                          ? `Periodo ${toDay(c.interestPeriodStart)} – ${toDay(c.interestPeriodEnd)} · vence ${toDay(c.dueDate)}`
+                          : `Vence ${toDate(c.dueDate)} · capital ${fmt(c.principal)} + interés ${fmt(c.interest)}`}
                     </span>
                   </div>
                   {isBorrowerViewer && c.status !== 'paid' && nextDue?.installmentId === c.installmentId && (

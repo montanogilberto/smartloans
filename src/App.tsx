@@ -27,6 +27,7 @@ import { actsAsLender } from './utils/productContext';
 import LoanChatListPage from './pages/loans/LoanChatListPage';
 import ExpedienteDigitalPage from './pages/clients/ExpedienteDigitalPage';
 import PageLoading from './components/ui/PageLoading';
+import PushNotificationsBootstrap from './components/notifications/PushNotificationsBootstrap';
 
 import { ExitConfirmProvider } from './contexts/ExitConfirmContext';
 
@@ -86,6 +87,8 @@ const App: React.FC = () => (
   <IonApp>
     <IonReactRouter>
       {/* Inside the router, like POS: it uses useIonRouter for the back-button confirm. */}
+      {/* Push: registro del dispositivo (tag app_gmoprestamos) y toque → detalle. */}
+      <PushNotificationsBootstrap />
       <ExitConfirmProvider>
         {/* Same shell as POS: the side menu is an overlay on phones and stays open
             beside the content from 792px up (where Header hides its menu button). */}

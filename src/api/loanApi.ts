@@ -14,6 +14,10 @@ export interface Loan {
   maturityDate?: string;
   loanStatus: string;
   notes?: string;
+  // RFC-019: 'interest_free' = 0 % dentro del plazo; postTermRate (anual %)
+  // aplica al capital que quede sin pagar al vencer la última cuota.
+  paymentPlan?: 'standard' | 'interest_free';
+  postTermRate?: number | null;
   created_At?: string;
   updated_at?: string;
 }

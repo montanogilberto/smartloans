@@ -292,6 +292,20 @@ export function useLenderDashboard() {
   //    stops counting as published, the loan shows it was done).
   const identityVerified = !!(faceRecord?.isVerified && faceRecord?.contractAccepted);
   const primaryBankAccount = findPrimaryBankAccount(bankAccounts);
+  // "Cuenta de pago" (RFC-016): la CLABE de SmartLoans, no Stripe Connect.
+  const [bankAccountsRefreshing, setBankAccountsRefreshing] = useState(false);
+  const reloadBankAccounts = async () => {
+    setBankAccountsRefreshing(true);
+    try {
+      setBankAccounts(await listBankAccounts(companyId, lenderClientId));
+    } catch (e) {
+      console.log('[LenderDashboard] reloadBankAccounts ❌', String(e));
+    } finally {
+      setBankAccountsRefreshing(false);
+      setBankAccountsLoaded(true);
+    }
+  };
+  const lenderHolderName = lenderClient ? `${lenderClient.first_name} ${lenderClient.last_name}` : '';
   const setupSteps = [
     {
       id: 'identity',
@@ -414,6 +428,9 @@ export function useLenderDashboard() {
     verificationSteps, verificationDone, verificationInReview,
     // primeros pasos (new-lender setup)
     setupSteps, setupDone, setupPct, setupProgress, setupLoaded, setupNextId,
+    // cuenta de pago = CLABE SmartLoans (RFC-016)
+    identityVerified, bankAccounts, setBankAccounts, bankAccountsLoaded,
+    bankAccountsRefreshing, reloadBankAccounts, primaryBankAccount, lenderHolderName,
     // stripe
     stripeAccount, stripeLoading, stripeError, showStripeOnboarding,
     setShowStripeOnboarding,

@@ -16,6 +16,44 @@ export interface Installment {
   remainingBalance: number;
   status: 'pending' | 'paid' | 'failed' | 'delinquent';
   paidAt?: string | null;
+  // RFC-019: 'POST_TERM_INTEREST' = interés del capital que quedó sin pagar
+  // después del plazo de un préstamo sin intereses (una fila por periodo).
+  installmentType?: 'REGULAR' | 'POST_TERM_INTEREST';
+  interestPeriodStart?: string | null;
+  interestPeriodEnd?: string | null;
+}
+
+export const isPostTermInterest = (i: Pick<Installment, 'installmentType'>) =>
+  i.installmentType === 'POST_TERM_INTEREST';
+
+/** RFC-019 — resumen del interés posterior al plazo (sólo plan 'interest_free'). */
+export interface PostTermInterest {
+  loanId: number;
+  paymentPlan: 'standard' | 'interest_free';
+  postTermRate?: number;
+  termEndDate?: string | null;
+  unpaidPrincipal?: number;
+  billedInterest?: number;
+  billedUnpaidInterest?: number;
+  accruedUnbilledInterest?: number;
+  nextCutoffDate?: string | null;
+}
+
+export async function fetchPostTermInterest(loanId: number, companyId: number): Promise<PostTermInterest | null> {
+  try {
+    const r = await fetch(`${BASE}/automated-payments/post-term-interest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loanId, companyId }),
+    });
+    if (!r.ok) return null;
+    const data: PostTermInterest = await r.json();
+    console.log('[Cuotas] postTermInterest ←', JSON.stringify({ loanId, plan: data.paymentPlan, termEndDate: data.termEndDate }));
+    return data;
+  } catch (e) {
+    console.log('[Cuotas] postTermInterest ❌', String(e));
+    return null;
+  }
 }
 
 export async function fetchInstallmentSchedule(loanId: number, companyId: number): Promise<Installment[]> {

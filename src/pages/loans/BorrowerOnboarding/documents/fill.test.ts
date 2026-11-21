@@ -70,6 +70,15 @@ describe('KYC document fill', () => {
     }
   });
 
+  it('the borrower documents describe the interest-free plan (RFC-019)', () => {
+    const c = fillContract({ ...base, signerRole: 'borrower' });
+    expect(c).toContain('Cuando la oferta aceptada sea un plan sin intereses');
+    expect(c).toContain('Ese interés no se capitaliza.');
+    expect(c).toContain('En un plan sin intereses, la tasa ordinaria es la que aplica al capital insoluto después del plazo.');
+    expect(fillPagare({ ...base, signerRole: 'borrower' }))
+      .toContain('el interés aplica sólo al capital que quede sin pagar al vencer el plazo');
+  });
+
   it('dates the constancia', () => {
     const r = fillResguardo(base);
     expect(r).toContain('Lugar y Fecha: 19 de noviembre de 2026');

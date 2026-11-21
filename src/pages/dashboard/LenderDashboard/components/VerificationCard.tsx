@@ -1,8 +1,9 @@
 import React from 'react';
 import {
-  IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonIcon,
+  IonButton, IonCard, IonCardContent, IonIcon,
   IonItem, IonLabel, IonList, IonNote, IonProgressBar,
 } from '@ionic/react';
+import CollapsibleHeader, { useCollapsed } from './CollapsibleHeader';
 import {
   addCircleOutline, checkmarkCircleOutline, documentTextOutline, ellipseOutline,
   personCircleOutline, shieldCheckmarkOutline, timeOutline,
@@ -15,9 +16,19 @@ import { LenderDashboardVM } from '../LenderDashboardLogic';
  * digital contract is valid. Reuses the same wizard borrowers use
  * (ClientFaceRecognitionPage), scoped to this lender's own clientId.
  */
-const VerificationCard: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
+const VerificationCard: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => {
+  const complete = !!(vm.faceRecord?.isVerified && vm.faceRecord?.contractAccepted);
+  const [collapsed, toggle] = useCollapsed('verification', complete);
+  const summary = complete
+    ? '✓ Identidad verificada'
+    : vm.verificationDone > 0
+      ? `${vm.verificationDone} de ${vm.verificationSteps.length} pasos`
+      : 'Verificación pendiente';
+  return (
   <IonCard className="ld-card">
-    <IonCardHeader><IonCardTitle>Verificación de identidad</IonCardTitle></IonCardHeader>
+    <CollapsibleHeader title="Verificación de identidad" collapsed={collapsed} onToggle={toggle} summary={summary}
+      progress={complete ? 1 : vm.verificationDone / Math.max(vm.verificationSteps.length, 1)} />
+    {!collapsed && (
     <IonCardContent>
       {vm.faceRecord?.isVerified && vm.faceRecord?.contractAccepted ? (
         <div className="ldx-identity-ok">
@@ -78,7 +89,9 @@ const VerificationCard: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
         </div>
       )}
     </IonCardContent>
+    )}
   </IonCard>
-);
+  );
+};
 
 export default VerificationCard;

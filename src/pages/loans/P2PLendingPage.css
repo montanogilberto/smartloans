@@ -705,6 +705,15 @@ ion-card.p2p-kpi::part(native) {
   color: #374151;
 }
 
+/* Ionic corta la etiqueta a una línea con "…": la declaración debe leerse completa. */
+.p2p-consent-box ion-checkbox::part(label) {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.4;
+  margin-inline-start: 10px;
+}
+
 /* Ticket de confirmación tras publicar capital */
 .p2p-ticket {
   text-align: center;
@@ -836,6 +845,15 @@ ion-card.p2p-kpi::part(native) {
 
 .p2p-calc-preview p { margin: 3px 0; }
 
+.p2p-plan-segment { margin-top: 6px; }
+
+.p2p-plan-hint {
+  font-size: 12px;
+  color: #1d4ed8;
+  margin: 6px 2px 0;
+  line-height: 1.4;
+}
+
 .p2p-legal-note {
   font-size: 11px;
   color: #6b7280;
@@ -880,6 +898,54 @@ ion-card.p2p-kpi::part(native) {
 }
 
 /* ══════════ Rediseño vista Invertir (mockup 2026-07) ══════════ */
+
+/* Panel plegable "Mi cuenta" (CLABE + billetera heredada) */
+.p2p-account-panel {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.p2p-account-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  color: #1f2937;
+  cursor: pointer;
+  text-align: left;
+}
+
+.p2p-account-toggle ion-icon { font-size: 18px; color: #2563eb; flex-shrink: 0; }
+.p2p-account-title { font-weight: 600; }
+.p2p-account-summary {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-size: 13px;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Dentro del panel los tiles ya no llevan su propio marco */
+.p2p-account-panel .p2p-action-tiles {
+  border: 0;
+  border-top: 1px solid #f3f4f6;
+  border-radius: 0;
+  margin-bottom: 0;
+}
+
+.p2p-pub-compact {
+  margin: 0 0 14px;
+}
 
 /* Tiles de acciones de billetera */
 .p2p-action-tiles {

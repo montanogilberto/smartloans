@@ -31,7 +31,7 @@ const PRODUCT_ICONS: Partial<Record<ProductContext, string>> = {
 const SideMenu: React.FC = () => {
   const history = useHistory();
   const {
-    isAuthenticated, userId, username, avatarUrl, clientId, availableProducts, activeProduct, setActiveProduct, logout,
+    isAuthenticated, userId, username, avatarUrl, clientId, companyId, availableProducts, activeProduct, setActiveProduct, logout,
   } = useUser();
   const [unread, setUnread] = useState(0);
 
@@ -39,8 +39,8 @@ const SideMenu: React.FC = () => {
   // (pushes, app resume, the inbox marking everything read).
   const loadUnread = useCallback(() => {
     if (!isAuthenticated || !userId) { setUnread(0); return; }
-    fetchMyNotifications(userId).then(r => setUnread(r.unreadCount)).catch(() => {});
-  }, [isAuthenticated, userId]);
+    fetchMyNotifications(userId, { companyId, clientId }).then(r => setUnread(r.unreadCount)).catch(() => {});
+  }, [isAuthenticated, userId, companyId, clientId]);
   useEffect(() => { loadUnread(); return onDataChanged(loadUnread); }, [loadUnread]);
 
   // Customer-facing agent: the GMO Prestamos assistant (same chat the Header's ✨

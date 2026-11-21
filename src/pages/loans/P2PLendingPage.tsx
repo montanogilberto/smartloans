@@ -27,7 +27,7 @@ import {
   cashOutline, trendingUpOutline, documentTextOutline, notificationsOutline,
   cardOutline,
   sendOutline, handLeftOutline, ribbonOutline, trashOutline, chatbubblesOutline, personAddOutline,
-  flaskOutline, chevronForwardOutline, shieldCheckmarkOutline,
+  flaskOutline, chevronForwardOutline, chevronDownOutline, chevronUpOutline, shieldCheckmarkOutline,
   megaphoneOutline, informationCircleOutline, closeOutline,
   cameraOutline, sparklesOutline,
 } from 'ionicons/icons';
@@ -51,6 +51,12 @@ const SHOW_BANKING_TEST_TOOLS = false;
 // actualizados, listo para que el lender apruebe/fondee) o Rechazar (terminal).
 type ProposalStatus = 'pending' | 'accepted' | 'rejected' | 'expired' | 'cancelled' | 'countered';
 
+// 'interest_free' = modo tipo tarjeta: 0% de interés dentro del plazo, pago
+// mínimo mensual = monto ÷ plazo. proposedRate (o counteredRate) es la tasa
+// anual que aplicaría al saldo que quede sin pagar al terminar el plazo.
+type PaymentPlan = 'standard' | 'interest_free';
+const isInterestFree = (p?: { paymentPlan?: PaymentPlan } | null) => p?.paymentPlan === 'interest_free';
+
 interface LoanProposal {
   proposalId: number;
   companyId: number;
@@ -59,6 +65,7 @@ interface LoanProposal {
   requestedAmount: number;
   proposedRate: number;
   termMonths: number;
+  paymentPlan?: PaymentPlan;
   status: ProposalStatus;
   lenderNote?: string;
   borrowerNote?: string;
@@ -370,6 +377,7 @@ const P2PLendingPage: React.FC = () => {
   const [propRate,     setPropRate]     = useState('');
   const [propTerm,     setPropTerm]     = useState('12');
   const [propNote,     setPropNote]     = useState('');
+  const [propPlan,     setPropPlan]     = useState<PaymentPlan>('standard');
 
   const [saving, setSaving] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
@@ -464,6 +472,23 @@ const P2PLendingPage: React.FC = () => {
 
   // Offers I published (lender)
   const myOffers     = offers.filter(o => o.lenderId === clientId);
+  // Ofertas = mercado de OTROS prestamistas; las propias viven en "Mis ofertas".
+  const marketOffers = isLender ? offers.filter(o => o.lenderId !== clientId) : offers;
+  // Capital publicado = lo DECLARADO en mis ofertas activas. No es dinero en GMO.
+  const publishedCapital = myOffers.reduce((s, o) => s + o.availableCapital, 0);
+  // Sin la pestaña Ofertas (sólo prestamista), arrancar en "Mis ofertas".
+  useEffect(() => {
+    if (!isBorrower && tab === 'offers') setTab('my');
+  }, [isBorrower, tab]);
+  // Billetera heredada (pre RFC-016): sólo se muestra si aún tiene saldo.
+  const hasLegacyWallet = (walletBalance ?? 0) > 0;
+  const [accountOpen, setAccountOpen] = useState<boolean>(() => {
+    try { return localStorage.getItem('p2p.accountPanelOpen') === '1'; } catch { return false; }
+  });
+  const toggleAccount = () => setAccountOpen(open => {
+    try { localStorage.setItem('p2p.accountPanelOpen', open ? '0' : '1'); } catch { /* sin storage */ }
+    return !open;
+  });
   // Proposals sent to me (lender receives them)
   const inboxProposals = proposals.filter(p => p.lenderId === clientId && p.status === 'pending');
   // My proposals (borrower sent them)
@@ -638,7 +663,7 @@ const P2PLendingPage: React.FC = () => {
 
     setSaving(true);
     console.log('[P2P] submitProposal: START', JSON.stringify({
-      borrowerId: clientId, lenderId: selectedOffer.lenderId, amount, rate, term,
+      borrowerId: clientId, lenderId: selectedOffer.lenderId, amount, rate, term, plan: propPlan,
     }));
     try {
       const lenderClient = clientMap[selectedOffer.lenderId];
@@ -650,6 +675,7 @@ const P2PLendingPage: React.FC = () => {
       const newProposal = await createLoanProposal({
         companyId, lenderId: selectedOffer.lenderId, borrowerId: clientId,
         requestedAmount: amount, proposedRate: rate, termMonths: term,
+        paymentPlan: propPlan,
         status: 'pending',
         borrowerNote: propNote,
       });
@@ -660,7 +686,7 @@ const P2PLendingPage: React.FC = () => {
       console.log('[P2P] submitProposal: SUCCESS — push sent to lender', selectedOffer.lenderId);
       showToast(`✓ Solicitud enviada a ${lenderClient?.first_name ?? 'prestamista'}`);
       setShowProposalModal(false);
-      setPropAmount(''); setPropRate(''); setPropTerm('12'); setPropNote('');
+      setPropAmount(''); setPropRate(''); setPropTerm('12'); setPropNote(''); setPropPlan('standard');
       setProposalTicket(newProposal);
       load();
     } catch (e: any) {
@@ -685,6 +711,17 @@ const P2PLendingPage: React.FC = () => {
       // proposedRate/termMonths nunca se sobreescriben (quedan como
       // historial), así que hay que leerlos vía effectiveTerms().
       const { amount: requestedAmount, rate: proposedRate, term: termMonths } = effectiveTerms(selectedProposal);
+      // Plan sin intereses: el préstamo se crea al 0% para que el calendario
+      // de cuotas salga en pagos iguales de monto ÷ plazo. proposedRate queda
+      // en la propuesta como la tasa que aplica al saldo vencido tras el plazo.
+      const interestFree = isInterestFree(selectedProposal);
+      const loanRate = interestFree ? 0 : proposedRate;
+      const planNote = interestFree ? ` Plan sin intereses; saldo tras el plazo: ${proposedRate}% anual.` : '';
+      // RFC-019: el préstamo guarda el plan y la tasa posterior al plazo (el
+      // backend genera las cuotas de interés del capital vencido).
+      const planTerms = interestFree
+        ? { paymentPlan: 'interest_free' as const, postTermRate: proposedRate }
+        : { paymentPlan: 'standard' as const };
       console.log('[P2P] acceptProposal: START', JSON.stringify({ proposalId, borrowerId, lenderId, requestedAmount, proposedRate, termMonths }));
 
       // RFC-002 Phase 1 rollout gate (docs/payments-action-plan.md) — mutually
@@ -749,11 +786,12 @@ const P2PLendingPage: React.FC = () => {
           loanNumber: `P2P-${Date.now()}`,
           clientId: borrowerId,
           principalAmount: requestedAmount,
-          interestRate: proposedRate,
+          interestRate: loanRate,
+          ...planTerms,
           termMonths,
           paymentFrequency: 'monthly',
           loanStatus: 'pending_funding',
-          notes: `Préstamo P2P (no-custodio). Prestamista clientId=${lenderId}`,
+          notes: `Préstamo P2P (no-custodio). Prestamista clientId=${lenderId}.${planNote}`,
         });
 
         const snapshots = await snapshotBankAccountsForLoan({
@@ -776,7 +814,7 @@ const P2PLendingPage: React.FC = () => {
 
         await createLoanContract({
           companyId, loanId: loan.loanId, borrowerClientId: borrowerId, lenderClientId: lenderId,
-          principalAmount: requestedAmount, interestRate: proposedRate, termMonths,
+          principalAmount: requestedAmount, interestRate: loanRate, termMonths,
           notes: `Aceptado desde propuesta ${proposalId} (P2P, no-custodio)`,
         }).catch((e) => console.log('[P2P] acceptProposal: contract create FAILED —', String(e)));
 
@@ -857,11 +895,12 @@ const P2PLendingPage: React.FC = () => {
         loanNumber: `P2P-${Date.now()}`,
         clientId: borrowerId,
         principalAmount: requestedAmount,
-        interestRate: proposedRate,
+        interestRate: loanRate,
+        ...planTerms,
         termMonths,
         paymentFrequency: 'monthly',
         loanStatus: 'active',
-        notes: `Préstamo P2P. Prestamista clientId=${lenderId}`,
+        notes: `Préstamo P2P. Prestamista clientId=${lenderId}.${planNote}`,
         disbursementDate,
       });
 
@@ -871,7 +910,7 @@ const P2PLendingPage: React.FC = () => {
         companyId,
         lenderId,
         principalAmount: requestedAmount,
-        interestRate: proposedRate,
+        interestRate: loanRate,
         termMonths,
         disbursementDate,
       });
@@ -880,7 +919,7 @@ const P2PLendingPage: React.FC = () => {
       // it). Non-fatal: money already moved; a miss falls back to the notes tag.
       await createLoanContract({
         companyId, loanId: loan.loanId, borrowerClientId: borrowerId, lenderClientId: lenderId,
-        principalAmount: requestedAmount, interestRate: proposedRate, termMonths,
+        principalAmount: requestedAmount, interestRate: loanRate, termMonths,
         notes: `Aceptado desde propuesta ${proposalId} (P2P)`,
       }).catch((e) => console.log('[P2P] acceptProposal: contract create FAILED —', String(e)));
 
@@ -1290,14 +1329,19 @@ const P2PLendingPage: React.FC = () => {
             <span className="p2p-amount-val">{fmt(terms.amount)}</span>
           </div>
           <div className="p2p-amount-item">
-            <IonNote className="p2p-amount-label">Tasa</IonNote>
-            <span className="p2p-amount-val">{terms.rate}%</span>
+            <IonNote className="p2p-amount-label">{isInterestFree(p) ? 'Sin intereses' : 'Tasa'}</IonNote>
+            <span className="p2p-amount-val">{isInterestFree(p) ? '0%' : `${terms.rate}%`}</span>
           </div>
           <div className="p2p-amount-item">
             <IonNote className="p2p-amount-label">Plazo</IonNote>
             <span className="p2p-amount-val">{terms.term} m</span>
           </div>
         </div>
+        {isInterestFree(p) && (
+          <p className="p2p-proposal-original">
+            Pago mínimo {fmt(terms.amount / terms.term)}/mes · saldo tras el plazo: {terms.rate}% anual
+          </p>
+        )}
         {isLenderView && p.status === 'pending' && (
           <div className="p2p-proposal-actions">
             <IonButton size="small" color="danger" fill="outline"
@@ -1402,6 +1446,16 @@ const P2PLendingPage: React.FC = () => {
         {/* ── Lender wallet actions — tiles compactos (SPEI primario,
             tarjeta/Stripe 2ª opción) ── */}
         {isLender && (
+          <div className="p2p-account-panel">
+            <button type="button" className="p2p-account-toggle" aria-expanded={accountOpen} onClick={toggleAccount}>
+              <IonIcon icon={cardOutline} />
+              <span className="p2p-account-title">Mi cuenta</span>
+              <span className="p2p-account-summary">
+                {hasVerifiedAccount ? `SPEI ····${primaryAccount?.clabeLast4 ?? ''}` : 'Vincula tu CLABE'}
+              </span>
+              <IonIcon icon={accountOpen ? chevronUpOutline : chevronDownOutline} />
+            </button>
+          {accountOpen && (
           <div className="p2p-action-tiles">
             <IonCard button className="p2p-action-tile" onClick={() => { console.log('[P2P] tile → bank modal (CLABE)'); setShowBankModal(true); }}>
               <IonIcon icon={cardOutline} />
@@ -1410,16 +1464,29 @@ const P2PLendingPage: React.FC = () => {
                 ? `···· ${primaryAccount?.clabeLast4 ?? ''}`
                 : 'requerida'}</span>
             </IonCard>
-            <IonCard button className="p2p-action-tile" onClick={goTopUp}>
-              <IonIcon icon={walletOutline} />
-              <strong>Recargar tarjeta</strong>
-              <span>2ª opción</span>
-            </IonCard>
-            <IonCard button className="p2p-action-tile" disabled={!walletBalance} onClick={() => { console.log('[P2P] tile → withdraw alert'); setShowWithdrawAlert(true); }}>
-              <IonIcon icon={cashOutline} />
-              <strong>Retirar fondos</strong>
-              <span>A mi cuenta</span>
-            </IonCard>
+            {/* Billetera heredada: RFC-016 deja el SPEI directo como único riel.
+                Sólo aparece mientras quede saldo por retirar. */}
+            {hasLegacyWallet && (
+              <IonCard button className="p2p-action-tile" onClick={openMovements}>
+                <IonIcon icon={walletOutline} />
+                <strong>{fmt(walletBalance ?? 0)}</strong>
+                <span>Saldo en cartera · movimientos</span>
+              </IonCard>
+            )}
+            {hasLegacyWallet && (
+              <IonCard button className="p2p-action-tile" onClick={goTopUp}>
+                <IonIcon icon={walletOutline} />
+                <strong>Recargar tarjeta</strong>
+                <span>2ª opción</span>
+              </IonCard>
+            )}
+            {hasLegacyWallet && (
+              <IonCard button className="p2p-action-tile" onClick={() => { console.log('[P2P] tile → withdraw alert'); setShowWithdrawAlert(true); }}>
+                <IonIcon icon={cashOutline} />
+                <strong>Retirar fondos</strong>
+                <span>A mi cuenta</span>
+              </IonCard>
+            )}
             {SHOW_BANKING_TEST_TOOLS && (
               <IonCard button className="p2p-action-tile p2p-tile-test" onClick={() => setShowDepositAlert(true)}>
                 <IonIcon icon={flaskOutline} />
@@ -1427,6 +1494,8 @@ const P2PLendingPage: React.FC = () => {
                 <span>Prueba SPEI</span>
               </IonCard>
             )}
+          </div>
+          )}
           </div>
         )}
 
@@ -1455,10 +1524,13 @@ const P2PLendingPage: React.FC = () => {
         {/* ── KPI row (lender) — chips de color como el mockup ── */}
         {isLender && (
           <div className="p2p-kpi-row">
-            <IonCard button className="p2p-kpi p2p-kpi2" onClick={openMovements}>
-              <span className="p2p-kpi2-icon p2p-kpi2-blue"><IonIcon icon={walletOutline} /></span>
-              <span className="p2p-kpi-val">{walletBalance !== null ? fmt(walletBalance) : fmt(myOffers.reduce((s, o) => s + o.availableCapital, 0))}</span>
-              <span className="p2p-kpi-label">Saldo en cartera{stripeBalance > 0 && speiBalance > 0 ? ' (SPEI + Stripe)' : ''}</span>
+            {/* Capital publicado = lo declarado en mis ofertas (no es dinero en
+                GMO). Antes aquí iba "Saldo en cartera", que además caía a esta
+                misma suma cuando el saldo no cargaba. */}
+            <IonCard button className="p2p-kpi p2p-kpi2" onClick={() => setTab('my')}>
+              <span className="p2p-kpi2-icon p2p-kpi2-blue"><IonIcon icon={megaphoneOutline} /></span>
+              <span className="p2p-kpi-val">{fmt(publishedCapital)}</span>
+              <span className="p2p-kpi-label">Capital publicado</span>
             </IonCard>
             <div className="p2p-kpi p2p-kpi2">
               <span className="p2p-kpi2-icon p2p-kpi2-purple"><IonIcon icon={notificationsOutline} /></span>
@@ -1488,9 +1560,12 @@ const P2PLendingPage: React.FC = () => {
 
         {/* ── Tabs ── */}
         <IonSegment value={tab} onIonChange={e => setTab(e.detail.value as any)} className="p2p-tabs">
-          <IonSegmentButton value="offers">
-            <IonLabel>Ofertas</IonLabel>
-          </IonSegmentButton>
+          {/* Ofertas = mercado para pedir préstamo: sólo para quien puede pedir. */}
+          {isBorrower && (
+            <IonSegmentButton value="offers">
+              <IonLabel>Ofertas</IonLabel>
+            </IonSegmentButton>
+          )}
           {isLender && (
             <IonSegmentButton value="proposals">
               <IonLabel>
@@ -1509,27 +1584,12 @@ const P2PLendingPage: React.FC = () => {
           {/* ════ TAB: Offers ════ */}
           {tab === 'offers' && (
             <div>
-              {isLender && (
-                <IonCard button className="p2p-pub-banner" onClick={() => { console.log('[P2P] pub banner → offer modal'); setShowOfferModal(true); }}>
-                  <span className="p2p-pub-icon">🎯</span>
-                  <div className="p2p-pub-text">
-                    <strong>Publica tu capital disponible</strong>
-                    <span>Conecta con acreditados verificados y genera rendimientos atractivos.</span>
-                  </div>
-                  {/* CTA visual — todo el card es el botón (no anidar button en button) */}
-                  <span className="p2p-pub-cta">
-                    Publicar capital
-                    <IonIcon icon={chevronForwardOutline} />
-                  </span>
-                </IonCard>
-              )}
-
-              {offers.length === 0 && (
+              {marketOffers.length === 0 && (
                 <EmptyState className="p2p-empty" icon={cashOutline}
                   text="No hay ofertas de capital activas en este momento" />
               )}
 
-              {offers.map(offer => {
+              {marketOffers.map(offer => {
                 const lender = clientMap[offer.lenderId];
                 const lenderBio = bioMap[offer.lenderId];
                 return (
@@ -1667,10 +1727,28 @@ const P2PLendingPage: React.FC = () => {
               )}
               {isLender && (
                 <>
+                  {/* Con una oferta activa basta un botón compacto; el banner
+                      grande es para quien aún no publica. */}
+                  {myOffers.length > 0 && (
+                    <IonButton expand="block" fill="outline" className="p2p-pub-compact"
+                      onClick={() => { console.log('[P2P] compact publish → offer modal'); setShowOfferModal(true); }}>
+                      <IonIcon icon={addOutline} slot="start" />
+                      Publicar más capital
+                    </IonButton>
+                  )}
                   {myOffers.length === 0 && (
-                    <EmptyState className="p2p-empty" icon={walletOutline}
-                      text="No has publicado ninguna oferta todavía."
-                      action={<IonButton fill="outline" onClick={() => setShowOfferModal(true)}>Publicar oferta</IonButton>} />
+                    <IonCard button className="p2p-pub-banner" onClick={() => { console.log('[P2P] pub banner → offer modal'); setShowOfferModal(true); }}>
+                      <span className="p2p-pub-icon">🎯</span>
+                      <div className="p2p-pub-text">
+                        <strong>Publica tu capital disponible</strong>
+                        <span>Conecta con acreditados verificados y genera rendimientos atractivos.</span>
+                      </div>
+                      {/* CTA visual — todo el card es el botón (no anidar button en button) */}
+                      <span className="p2p-pub-cta">
+                        Publicar capital
+                        <IonIcon icon={chevronForwardOutline} />
+                      </span>
+                    </IonCard>
                   )}
                   {myOffers.map(offer => (
                     <IonCard key={offer.offerId} className="p2p-my-offer-card">
@@ -1877,8 +1955,10 @@ const P2PLendingPage: React.FC = () => {
                   <strong>{fmt(proposalTicket.requestedAmount)}</strong>
                 </div>
                 <div className="p2p-ticket-row">
-                  <span>Tasa propuesta</span>
-                  <strong>{proposalTicket.proposedRate}% anual</strong>
+                  <span>{isInterestFree(proposalTicket) ? 'Tipo de pago' : 'Tasa propuesta'}</span>
+                  <strong>{isInterestFree(proposalTicket)
+                    ? `Sin intereses · ${proposalTicket.proposedRate}% anual tras el plazo`
+                    : `${proposalTicket.proposedRate}% anual`}</strong>
                 </div>
                 <div className="p2p-ticket-row">
                   <span>Plazo</span>
@@ -1935,7 +2015,21 @@ const P2PLendingPage: React.FC = () => {
                   onIonInput={e => setPropAmount(e.detail.value ?? '')} className="p2p-input" />
               </div>
               <div className="p2p-form-group">
-                <IonLabel>Tasa de interés que propones (% anual) *</IonLabel>
+                <IonLabel>Tipo de pago *</IonLabel>
+                <IonSegment value={propPlan} onIonChange={e => setPropPlan((e.detail.value as PaymentPlan) ?? 'standard')} className="p2p-plan-segment">
+                  <IonSegmentButton value="standard"><IonLabel>Con intereses</IonLabel></IonSegmentButton>
+                  <IonSegmentButton value="interest_free"><IonLabel>Sin intereses</IonLabel></IonSegmentButton>
+                </IonSegment>
+                {propPlan === 'interest_free' && (
+                  <p className="p2p-plan-hint">
+                    Como tarjeta de crédito: no generas intereses si liquidas dentro del plazo. Cada mes pagas al menos el pago mínimo.
+                  </p>
+                )}
+              </div>
+              <div className="p2p-form-group">
+                <IonLabel>{propPlan === 'interest_free'
+                  ? 'Tasa si queda saldo al terminar el plazo (% anual) *'
+                  : 'Tasa de interés que propones (% anual) *'}</IonLabel>
                 <IonInput type="number" placeholder={selectedOffer.minRate.toString()} value={propRate}
                   onIonInput={e => setPropRate(e.detail.value ?? '')} className="p2p-input" />
               </div>
@@ -1951,10 +2045,18 @@ const P2PLendingPage: React.FC = () => {
                   onIonInput={e => setPropNote(e.detail.value ?? '')} className="p2p-input" />
               </div>
               {propAmount && propRate && propTerm && (
-                <div className="p2p-calc-preview">
-                  <p><strong>Pago mensual estimado:</strong> {fmt(parseFloat(propAmount) * (parseFloat(propRate) / 100 / 12 + 1 / parseInt(propTerm)))}</p>
-                  <p><strong>Total a pagar:</strong> {fmt(parseFloat(propAmount) * (1 + parseFloat(propRate) / 100 * parseInt(propTerm) / 12))}</p>
-                </div>
+                propPlan === 'interest_free' ? (
+                  <div className="p2p-calc-preview">
+                    <p><strong>Pago mínimo mensual:</strong> {fmt(parseFloat(propAmount) / parseInt(propTerm))}</p>
+                    <p><strong>Total a pagar:</strong> {fmt(parseFloat(propAmount))} (0% de interés)</p>
+                    <p>Si al terminar los {propTerm} meses queda saldo, ese saldo genera {propRate}% anual.</p>
+                  </div>
+                ) : (
+                  <div className="p2p-calc-preview">
+                    <p><strong>Pago mensual estimado:</strong> {fmt(parseFloat(propAmount) * (parseFloat(propRate) / 100 / 12 + 1 / parseInt(propTerm)))}</p>
+                    <p><strong>Total a pagar:</strong> {fmt(parseFloat(propAmount) * (1 + parseFloat(propRate) / 100 * parseInt(propTerm) / 12))}</p>
+                  </div>
+                )
               )}
               <p className="p2p-legal-note">
                 Al enviar esta solicitud confirmas que has leído y firmado el Pagaré y el Contrato de Crédito P2P. El Pagaré firmado digitalmente es el único documento que se presentará ante juez en caso de incumplimiento.
@@ -1978,7 +2080,9 @@ const P2PLendingPage: React.FC = () => {
         cssClass="p2p-confirm-sheet"
         header="Aprobar préstamo"
         subHeader={selectedProposal
-          ? `${fmt(selectedProposal.requestedAmount)} a ${selectedProposal.proposedRate}% anual por ${selectedProposal.termMonths} meses para ${clientLabel(selectedProposal.borrowerId)}.`
+          ? (isInterestFree(selectedProposal)
+              ? `${fmt(effectiveTerms(selectedProposal).amount)} sin intereses en ${effectiveTerms(selectedProposal).term} meses (pago mínimo ${fmt(effectiveTerms(selectedProposal).amount / effectiveTerms(selectedProposal).term)}/mes; ${effectiveTerms(selectedProposal).rate}% anual al saldo tras el plazo) para ${clientLabel(selectedProposal.borrowerId)}.`
+              : `${fmt(selectedProposal.requestedAmount)} a ${selectedProposal.proposedRate}% anual por ${selectedProposal.termMonths} meses para ${clientLabel(selectedProposal.borrowerId)}.`)
           : undefined}
         buttons={[
           { text: 'Aprobar préstamo', icon: checkmarkCircle, cssClass: 'p2p-sheet-confirm', handler: acceptProposal },

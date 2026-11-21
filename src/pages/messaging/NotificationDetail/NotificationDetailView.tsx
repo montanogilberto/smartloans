@@ -3,7 +3,7 @@ import {
   IonButton, IonCard, IonCardContent, IonContent, IonIcon, IonPage,
   IonRefresher, IonRefresherContent, IonSpinner,
 } from '@ionic/react';
-import { arrowForwardOutline, listOutline, notificationsOutline } from 'ionicons/icons';
+import { arrowForwardOutline, homeOutline, listOutline, notificationsOutline } from 'ionicons/icons';
 import Header from '../../../components/layout/Header';
 import AlertPopover from '../../../components/popovers/AlertPopover';
 import MailPopover from '../../../components/popovers/MailPopover';
@@ -34,7 +34,15 @@ const NotificationDetailView: React.FC = () => {
 
         {!info && (vm.loading
           ? <PageLoading text="Cargando notificación…" />
-          : <EmptyState icon={notificationsOutline} text="No hay información de esta notificación." />)}
+          : (
+            <>
+              <EmptyState icon={notificationsOutline} text="No hay información de esta notificación." />
+              <IonButton expand="block" className="ntd-action" onClick={vm.openApp}>
+                <IonIcon slot="start" icon={homeOutline} />
+                Abrir la app
+              </IonButton>
+            </>
+          ))}
 
         {info && (
           <>
@@ -67,6 +75,10 @@ const NotificationDetailView: React.FC = () => {
                 <IonIcon slot="end" icon={arrowForwardOutline} />
               </IonButton>
             )}
+            <IonButton expand="block" fill={vm.relatedRoute ? 'outline' : 'solid'} className="ntd-action" onClick={vm.openApp}>
+              <IonIcon slot="start" icon={homeOutline} />
+              Abrir la app
+            </IonButton>
             <IonButton expand="block" fill="outline" className="ntd-action" onClick={vm.openInbox}>
               <IonIcon slot="start" icon={listOutline} />
               Ver todas mis notificaciones
